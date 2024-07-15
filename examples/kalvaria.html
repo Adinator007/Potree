@@ -130,35 +130,48 @@
           const loader = new Potree.ShapefileLoader();
           loader.transform = proj4("EPSG:23700", "EPSG:23700");
 
-          try {
-            const shpPoints = await loader.load(
-              "/examples/kalvaria_pcd/tree_height_lines.shp"
-            );
+          const loadShapefile = async (path, color) => {
+            try {
+              const shpPoints = await loader.load(path);
 
-            if (shpPoints && shpPoints.node) {
-              // Apply transformation to shapefile coordinates
-              shpPoints.node.position.set(0, 0, 0); // Set position to offset
-              shpPoints.node.updateMatrixWorld(true);
+              if (shpPoints && shpPoints.node) {
+                // Apply transformation to shapefile coordinates
+                shpPoints.node.position.set(0, 0, 0); // Set position to offset
+                shpPoints.node.updateMatrixWorld(true);
 
-              shpPoints.node.traverse((node) => {
-                if (node.material) {
-                  node.material.color.setRGB(0.3, 0.3, 1);
-                }
-              });
+                shpPoints.node.traverse((node) => {
+                  if (node.material) {
+                    node.material.color.set(color);
+                  }
+                });
 
-              shapeNode.add(shpPoints.node);
-            } else {
-              console.error(
-                "Loaded shapefile node is not a THREE.Object3D instance or is undefined:",
-                shpPoints.node
-              );
+                shapeNode.add(shpPoints.node);
+              } else {
+                console.error(
+                  "Loaded shapefile node is not a THREE.Object3D instance or is undefined:",
+                  shpPoints.node
+                );
+              }
+            } catch (error) {
+              console.error(`Error loading shapefile (${path}):`, error);
             }
-          } catch (error) {
-            console.error("Error loading shapefile:", error);
-          }
+          };
+
+          // Load the specified shapefiles with distinct colors
+          await loadShapefile(
+            "/examples/kalvaria_pcd/tree_height_lines.shp",
+            new THREE.Color(0.3, 0.3, 1)
+          );
+          await loadShapefile(
+            "/examples/kalvaria_pcd/convex_hulls.shp",
+            new THREE.Color(1, 0, 0)
+          );
+          await loadShapefile(
+            "/examples/kalvaria_pcd/FaKoronaPoligonok.shp",
+            new THREE.Color(0, 1, 0)
+          );
         });
       };
-
       loadPointCloud("/examples/kalvaria_pcd/metadata.json", "Kalvaria");
 
       viewer.addEventListener("update", () => {
