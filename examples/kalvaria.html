@@ -130,22 +130,12 @@
           const loader = new Potree.ShapefileLoader();
           loader.transform = proj4("EPSG:23700", "EPSG:23700");
 
-          //   proj4.defs(
-          //     "WGS84",
-          //     "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
-          //   );
-          //   proj4.defs("pointcloud", pointcloud.projection);
-          //   let transform = proj4("WGS84", "pointcloud");
-
           try {
             const shpPoints = await loader.load(
               "/examples/kalvaria_pcd/tree_height_lines.shp"
             );
 
             if (shpPoints && shpPoints.node) {
-              // Print shapefile geometries to console
-              console.log("Shapefile geometries:", shpPoints);
-
               // Apply transformation to shapefile coordinates
               shpPoints.node.position.set(0, 0, 0); // Set position to offset
               shpPoints.node.updateMatrixWorld(true);
