@@ -39,66 +39,31 @@ export class ShapefileLoader {
 
   featureToSceneNode(feature, matLine) {
     let geometry = feature.geometry;
-
-    let color = new THREE.Color(1, 1, 1);
-
     let transform = this.transform;
     if (transform === null) {
       transform = { forward: (v) => v };
     }
 
-    if (feature.geometry.type === "Point") {
+    const shapeNode = new THREE.Object3D();
+
+    if (geometry.type === "Point") {
       let sg = new THREE.SphereGeometry(1, 18, 18);
       let sm = new THREE.MeshNormalMaterial();
       let s = new THREE.Mesh(sg, sm);
 
-      let [long, lat] = geometry.coordinates;
+      let [long, lat, elev = 0] = geometry.coordinates;
       let pos = transform.forward([long, lat]);
 
-      s.position.set(...pos, 20);
-
+      s.position.set(...pos, elev);
       s.scale.set(10, 10, 10);
 
       return s;
-    } else if (geometry.type === "LineString") {
+    } else if (geometry.type === "LineString" || geometry.type === "LineStringZ") {
       let coordinates = [];
-
       let min = new THREE.Vector3(Infinity, Infinity, Infinity);
+
       for (let i = 0; i < geometry.coordinates.length; i++) {
-        let [long, lat] = geometry.coordinates[i];
-        let pos = transform.forward([long, lat]);
-
-        min.x = Math.min(min.x, pos[0]);
-        min.y = Math.min(min.y, pos[1]);
-        min.z = Math.min(min.z, 20);
-
-        coordinates.push(...pos, 20);
-        if (i > 0 && i < geometry.coordinates.length - 1) {
-          coordinates.push(...pos, 20);
-        }
-      }
-
-      for (let i = 0; i < coordinates.length; i += 3) {
-        coordinates[i + 0] -= min.x;
-        coordinates[i + 1] -= min.y;
-        coordinates[i + 2] -= min.z;
-      }
-
-      const lineGeometry = new LineGeometry();
-      lineGeometry.setPositions(coordinates);
-
-      const line = new Line2(lineGeometry, matLine);
-      line.computeLineDistances();
-      line.scale.set(1, 1, 1);
-      line.position.copy(min);
-
-      return line;
-    } else if (geometry.type === "LineStringZ") {
-      let coordinates = [];
-
-      let min = new THREE.Vector3(Infinity, Infinity, Infinity);
-      for (let i = 0; i < geometry.coordinates.length; i++) {
-        let [long, lat, elev] = geometry.coordinates[i];
+        let [long, lat, elev = 0] = geometry.coordinates[i];
         let pos = transform.forward([long, lat]);
 
         min.x = Math.min(min.x, pos[0]);
@@ -126,22 +91,22 @@ export class ShapefileLoader {
       line.position.copy(min);
 
       return line;
-    } else if (geometry.type === "Polygon") {
-      for (let pc of geometry.coordinates) {
+    } else if (geometry.type === "Polygon" || geometry.type === "PolygonZ") {
+      for (let ring of geometry.coordinates) {
         let coordinates = [];
-
         let min = new THREE.Vector3(Infinity, Infinity, Infinity);
-        for (let i = 0; i < pc.length; i++) {
-          let [long, lat] = pc[i];
+
+        for (let i = 0; i < ring.length; i++) {
+          let [long, lat, elev = 0] = ring[i];
           let pos = transform.forward([long, lat]);
 
           min.x = Math.min(min.x, pos[0]);
           min.y = Math.min(min.y, pos[1]);
-          min.z = Math.min(min.z, 20);
+          min.z = Math.min(min.z, elev);
 
-          coordinates.push(...pos, 20);
-          if (i > 0 && i < pc.length - 1) {
-            coordinates.push(...pos, 20);
+          coordinates.push(pos[0], pos[1], elev);
+          if (i > 0 && i < ring.length - 1) {
+            coordinates.push(pos[0], pos[1], elev);
           }
         }
 
@@ -159,10 +124,12 @@ export class ShapefileLoader {
         line.scale.set(1, 1, 1);
         line.position.copy(min);
 
-        return line;
+        shapeNode.add(line);
       }
+
+      return shapeNode;
     } else {
-      console.log("unhandled feature: ", feature);
+      console.log("Unhandled feature: ", feature);
     }
   }
 

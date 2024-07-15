@@ -125,7 +125,7 @@
             viewer.scene.addPointCloud(pointcloud);
 
             // Define the z-direction shift amount
-            const zShiftAmount = 92; // Adjust this value as necessary
+            const zShiftAmount = offset[2] + 7; // Adjust this value as necessary
 
             // Load and add shapefiles
             const loader = new Potree.ShapefileLoader();
@@ -139,6 +139,7 @@
                   // Apply transformation to shapefile coordinates
                   shpPoints.node.position.set(0, 0, zShift); // Set position to offset and apply z shift
                   shpPoints.node.updateMatrixWorld(true);
+                  console.log("SHAPE type: ", shpPoints)
 
                   shpPoints.node.traverse((node) => {
                     if (node.material) {
@@ -166,7 +167,7 @@
             await loadShapefile(
               "/examples/kalvaria_pcd/convex_hulls.shp",
               new THREE.Color(1, 0, 0),
-              zShiftAmount
+              
             );
             await loadShapefile(
               "/examples/kalvaria_pcd/FaKoronaPoligonok.shp",
