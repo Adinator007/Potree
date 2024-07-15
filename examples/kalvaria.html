@@ -121,7 +121,7 @@
           console.log("Point cloud center position:", center);
 
           // Set initial camera view based on the point cloud's position
-          viewer.scene.view.position.set(center.x, center.y, center.z + 100); // Adjust distance as necessary
+          viewer.scene.view.position.set(center.x, center.y, center.z + 50); // Adjust distance as necessary
           viewer.scene.view.lookAt(center);
 
           viewer.scene.addPointCloud(pointcloud);
@@ -147,7 +147,7 @@
               console.log("Shapefile geometries:", shpPoints);
 
               // Apply transformation to shapefile coordinates
-              shpPoints.node.position.set(0, 0, 0); // Set position to offset
+              shpPoints.node.position.set(0, 0, 100); // Set position to offset
               shpPoints.node.updateMatrixWorld(true);
 
               shpPoints.node.traverse((node) => {
