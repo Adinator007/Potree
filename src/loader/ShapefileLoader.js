@@ -60,10 +60,7 @@ export class ShapefileLoader {
       s.scale.set(10, 10, 10);
 
       return s;
-    } else if (
-      geometry.type === "LineString" ||
-      geometry.type === "LineStringZ"
-    ) {
+    } else if (geometry.type === "LineString") {
       let coordinates = [];
 
       let min = new THREE.Vector3(Infinity, Infinity, Infinity);
@@ -78,6 +75,39 @@ export class ShapefileLoader {
         coordinates.push(...pos, 20);
         if (i > 0 && i < geometry.coordinates.length - 1) {
           coordinates.push(...pos, 20);
+        }
+      }
+
+      for (let i = 0; i < coordinates.length; i += 3) {
+        coordinates[i + 0] -= min.x;
+        coordinates[i + 1] -= min.y;
+        coordinates[i + 2] -= min.z;
+      }
+
+      const lineGeometry = new LineGeometry();
+      lineGeometry.setPositions(coordinates);
+
+      const line = new Line2(lineGeometry, matLine);
+      line.computeLineDistances();
+      line.scale.set(1, 1, 1);
+      line.position.copy(min);
+
+      return line;
+    } else if (geometry.type === "LineStringZ") {
+      let coordinates = [];
+
+      let min = new THREE.Vector3(Infinity, Infinity, Infinity);
+      for (let i = 0; i < geometry.coordinates.length; i++) {
+        let [long, lat, elev] = geometry.coordinates[i];
+        let pos = transform.forward([long, lat]);
+
+        min.x = Math.min(min.x, pos[0]);
+        min.y = Math.min(min.y, pos[1]);
+        min.z = Math.min(min.z, elev);
+
+        coordinates.push(pos[0], pos[1], elev);
+        if (i > 0 && i < geometry.coordinates.length - 1) {
+          coordinates.push(pos[0], pos[1], elev);
         }
       }
 
