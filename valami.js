@@ -61,6 +61,7 @@
       import * as THREE from "../libs/three.js/build/three.module.js";
 
       let selectedTreeId = null;
+      let treeCoordinates = {};
 
       window.viewer = new Potree.Viewer(
         document.getElementById("potree_render_area")
@@ -114,6 +115,7 @@
                 y: parseFloat(parts[2]),
                 z: parseFloat(parts[3]),
               });
+              treeCoordinates[tree.id] = { x: tree.x, y: tree.y, z: tree.z };
             }
           }
 
@@ -129,86 +131,33 @@
             treeIdSelect.add(option);
           });
 
-          treeIdSelect.addEventListener("change", () => {
-            selectedTreeId = treeIdSelect.value;
-            console.log(`Selected Tree ID: ${selectedTreeId}`);
-
-            const selectedTree = treeData.find(
-              (tree) => tree.id === selectedTreeId
-            );
-            if (selectedTree) {
-              const { x, y, z } = selectedTree;
-              console.log(
-                `Coordinates for selected tree ID (${selectedTreeId}):`,
-                { x, y, z }
-              );
-              filterPointCloud(new THREE.Vector3(x, y, z), 5); // Filter 5x5x5 cube
-            }
-          });
-        };
-
-        const logObjectRecursively = (obj, depth = 0, parentKey = "") => {
-          const indent = " ".repeat(depth * 2);
-          for (const key in obj) {
-            if (obj.hasOwnProperty(key)) {
-              const value = obj[key];
-              const type = typeof value;
-              console.log(`${indent}${parentKey}${key} (${type}):`, value);
-              if (type === "object" && value !== null) {
-                logObjectRecursively(value, depth + 1, `${parentKey}${key}.`);
-              }
-            }
-          }
+          //   treeIdSelect.addEventListener("change", () => {
+          //     selectedTreeId = treeIdSelect.value;
+          //     console.log(`Selected Tree ID: ${selectedTreeId}`);
+          //   });
         };
 
         const filterPointCloud = (center, radius) => {
-          console.log(
-            `Filtering point cloud with center: ${center}, radius: ${radius}`
-          );
-
           const box = new THREE.Box3(
-            new THREE.Vector3(
-              center.x - radius,
-              center.y - radius,
-              center.z - radius
-            ),
-            new THREE.Vector3(
-              center.x + radius,
-              center.y + radius,
-              center.z + radius
-            )
+            new THREE.Vector3(center.x - radius, center.y - radius, -Infinity),
+            new THREE.Vector3(center.x + radius, center.y + radius, Infinity)
           );
 
-          console.log("Created bounding box:", box);
-
-          viewer.scene.pointclouds.forEach((pointcloud, pointcloudIndex) => {
-            console.log(
-              `Processing point cloud ${pointcloudIndex + 1}/${
-                viewer.scene.pointclouds.length
-              }`,
-              pointcloud
-            );
-
-            // logObjectRecursively(pointcloud, 3);
-
+          viewer.scene.pointclouds.forEach((pointcloud) => {
             if (pointcloud.nodes) {
-              pointcloud.nodes.traverse((node, nodeIndex) => {
-                const intersects = node.boundingBox.intersectsBox(box);
-                node.visible = intersects;
-
-                console.log(`Node ${nodeIndex + 1}:`, node);
-                console.log(`Node bounding box: ${node.boundingBox}`);
-                console.log(`Intersects with filter box: ${intersects}`);
-                console.log(`Node visibility: ${node.visible}`);
+              pointcloud.nodes.traverse((node) => {
+                if (node.boundingBox.intersectsBox(box)) {
+                  node.visible = true;
+                } else {
+                  node.visible = false;
+                }
               });
-            } else {
-              console.warn(`Point cloud ${pointcloudIndex + 1} has no nodes.`);
             }
           });
 
-          console.log("Dispatching visibility_changed event.");
           viewer.scene.dispatchEvent({ type: "visibility_changed" });
         };
+
         document
           .getElementById("submit_button")
           .addEventListener("click", () => {
