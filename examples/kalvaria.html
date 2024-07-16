@@ -321,39 +321,45 @@
               zShiftAmount
             );
 
-            // Crop point cloud using a bounding box
-            const cropPointCloud = (min, max) => {
-              const box = new THREE.Box3(
-                new THREE.Vector3(min.x, min.y, min.z),
-                new THREE.Vector3(max.x, max.y, max.z)
-              );
+            // Define and add volumes for cropping
+            const addVolume = (name, scale, position, visible) => {
+              let volume = new Potree.BoxVolume();
+              volume.name = name;
+              volume.scale.set(scale.x, scale.y, scale.z);
+              volume.position.set(position.x, position.y, position.z);
+              volume.clip = true;
+              volume.visible = visible;
 
-              const clipVolume = new Potree.ClipVolume(box);
-              viewer.scene.addClipVolume(clipVolume);
-
-              pointcloud.material.clipBoxes = [clipVolume.box];
-              pointcloud.material.uniforms.clipBoxes.value =
-                pointcloud.material.clipBoxes;
+              viewer.scene.addVolume(volume);
             };
 
-            // Define the bounding box for cropping (adjust these values as necessary)
-            const min = {
-              x: center.x - 50,
-              y: center.y - 50,
-              z: center.z - 50,
+            // Define the bounding box dimensions based on the center of the point cloud
+            const scale = { x: 100, y: 100, z: 100 }; // Adjust these values as necessary
+            const positionVisible = {
+              x: center.x,
+              y: center.y,
+              z: center.z,
             };
-            const max = {
-              x: center.x + 50,
-              y: center.y + 50,
-              z: center.z + 50,
+            const positionInvisible = {
+              x: center.x - 200, // Adjust these values as necessary
+              y: center.y,
+              z: center.z,
             };
 
-            cropPointCloud(min, max);
+            // Add visible volume
+            addVolume("Visible", scale, positionVisible, true);
+
+            // Add invisible volume
+            addVolume("Invisible", scale, positionInvisible, false);
+
+            // Set the clip task to show inside the volumes
+            viewer.setClipTask(Potree.ClipTask.SHOW_INSIDE);
           });
         } catch (error) {
           console.error("Failed to load point cloud", error);
         }
       };
+
       loadPointCloud("/examples/kalvaria_pcd/metadata.json", "Kalvaria");
 
       viewer.addEventListener("update", () => {
