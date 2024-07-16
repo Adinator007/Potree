@@ -334,12 +334,14 @@
             };
 
             // Define the bounding box dimensions based on the center of the point cloud
-            const scale = { x: 100, y: 100, z: 100 }; // Adjust these values as necessary
+            const scale = { x: 50, y: 50, z: 100 }; // Adjust these values as necessary
             const positionVisible = {
               x: center.x,
               y: center.y,
               z: center.z,
             };
+            // todo: remove
+            console.log("Is the position not changing??", positionVisible);
             const positionInvisible = {
               x: center.x - 200, // Adjust these values as necessary
               y: center.y,
@@ -348,9 +350,6 @@
 
             // Add visible volume
             addVolume("Visible", scale, positionVisible, true);
-
-            // Add invisible volume
-            addVolume("Invisible", scale, positionInvisible, false);
 
             // Set the clip task to show inside the volumes
             viewer.setClipTask(Potree.ClipTask.SHOW_INSIDE);
