@@ -188,22 +188,6 @@
               }`,
               pointcloud
             );
-
-            // logObjectRecursively(pointcloud, 3);
-
-            if (pointcloud.nodes) {
-              pointcloud.nodes.traverse((node, nodeIndex) => {
-                const intersects = node.boundingBox.intersectsBox(box);
-                node.visible = intersects;
-
-                console.log(`Node ${nodeIndex + 1}:`, node);
-                console.log(`Node bounding box: ${node.boundingBox}`);
-                console.log(`Intersects with filter box: ${intersects}`);
-                console.log(`Node visibility: ${node.visible}`);
-              });
-            } else {
-              console.warn(`Point cloud ${pointcloudIndex + 1} has no nodes.`);
-            }
           });
 
           console.log("Dispatching visibility_changed event.");
@@ -336,9 +320,38 @@
               new THREE.Color(0, 1, 0),
               zShiftAmount
             );
+
+            // Crop point cloud using a bounding box
+            const cropPointCloud = (min, max) => {
+              const box = new THREE.Box3(
+                new THREE.Vector3(min.x, min.y, min.z),
+                new THREE.Vector3(max.x, max.y, max.z)
+              );
+
+              const clipVolume = new Potree.ClipVolume(box);
+              viewer.scene.addClipVolume(clipVolume);
+
+              pointcloud.material.clipBoxes = [clipVolume.box];
+              pointcloud.material.uniforms.clipBoxes.value =
+                pointcloud.material.clipBoxes;
+            };
+
+            // Define the bounding box for cropping (adjust these values as necessary)
+            const min = {
+              x: center.x - 50,
+              y: center.y - 50,
+              z: center.z - 50,
+            };
+            const max = {
+              x: center.x + 50,
+              y: center.y + 50,
+              z: center.z + 50,
+            };
+
+            cropPointCloud(min, max);
           });
         } catch (error) {
-          console.error("Error loading point cloud:", error);
+          console.error("Failed to load point cloud", error);
         }
       };
       loadPointCloud("/examples/kalvaria_pcd/metadata.json", "Kalvaria");
