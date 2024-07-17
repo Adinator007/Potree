@@ -327,35 +327,38 @@
             ) => {
               console.log("Starting to modify shapefile...");
 
+              let maxZNode = null;
+              let maxZValue = -Infinity;
+
               shapefileNode.traverse((node) => {
-                console.log("Traversing node:", node);
-
-                if (node.isObject3D) {
-                  console.log(
-                    "Node is a THREE.Object3D instance. Modifying position..."
-                  );
+                if (node.isObject3D && originalPositions[node.uuid]) {
                   const originalPosition = originalPositions[node.uuid];
-                  if (originalPosition) {
-                    node.position.x = originalPosition.x + deltaX;
-                    node.position.y = originalPosition.y + deltaY;
-                    node.position.z = originalPosition.z + deltaZShift;
-                    console.log(
-                      `New position: x=${node.position.x}, y=${node.position.y}, z=${node.position.z}`
-                    );
-                    node.updateMatrixWorld(true);
+                  if (originalPosition.z > maxZValue) {
+                    maxZValue = originalPosition.z;
+                    maxZNode = node;
                   }
-                } else {
-                  console.log("Node is not a THREE.Object3D instance.");
-                }
-
-                if (node.material) {
-                  console.log("Node has material. Changing color...");
-                  node.material.color.set(newColor);
-                  console.log(`New color: ${node.material.color.getStyle()}`);
-                } else {
-                  console.log("Node does not have material.");
                 }
               });
+
+              if (maxZNode) {
+                const originalPosition = originalPositions[maxZNode.uuid];
+                maxZNode.position.x = originalPosition.x + deltaX;
+                maxZNode.position.y = originalPosition.y + deltaY;
+                maxZNode.position.z = originalPosition.z + deltaZShift;
+                console.log(
+                  `New position of top node: x=${maxZNode.position.x}, y=${maxZNode.position.y}, z=${maxZNode.position.z}`
+                );
+                maxZNode.updateMatrixWorld(true);
+
+                if (maxZNode.material) {
+                  maxZNode.material.color.set(newColor);
+                  console.log(
+                    `New color of top node: ${maxZNode.material.color.getStyle()}`
+                  );
+                }
+              } else {
+                console.log("No top node found to modify.");
+              }
 
               console.log("Finished modifying shapefile.");
             };
