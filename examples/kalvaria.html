@@ -216,6 +216,22 @@
             }
           });
 
+        document
+          .getElementById("x_slider")
+          .addEventListener("input", (event) => {
+            document.getElementById(
+              "x_value"
+            ).textContent = `${event.target.value}`;
+          });
+
+        document
+          .getElementById("y_slider")
+          .addEventListener("input", (event) => {
+            document.getElementById(
+              "y_value"
+            ).textContent = `${event.target.value}`;
+          });
+
         parseTreeData("/examples/kalvaria_pcd/torzs_koordinatak_plusz.txt");
       });
 
