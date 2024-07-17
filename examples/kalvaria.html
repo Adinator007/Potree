@@ -309,12 +309,14 @@
               }
             };
 
-            const modifyShapefile = (shapefileNode, newColor, newZShift) => {
-              console.log(
-                "Starting to modify shapefile...",
-                newColor,
-                newZShift
-              );
+            const modifyShapefile = (
+              shapefileNode,
+              newColor,
+              newX,
+              newY,
+              newZShift
+            ) => {
+              console.log("Starting to modify shapefile...");
 
               shapefileNode.traverse((node) => {
                 console.log("Traversing node:", node);
@@ -323,8 +325,10 @@
                   console.log(
                     "Node is a THREE.Object3D instance. Modifying position..."
                   );
-                  node.position.z += newZShift;
-                  console.log(`New Z position: ${node.position.z}`);
+                  node.position.set(newX, newY, newZShift);
+                  console.log(
+                    `New position: x=${node.position.x}, y=${node.position.y}, z=${node.position.z}`
+                  );
                   node.updateMatrixWorld(true);
                 } else {
                   console.log("Node is not a THREE.Object3D instance.");
@@ -349,11 +353,22 @@
                 new THREE.Color(0.3, 0.3, 1)
               );
 
-              // Delay for 5 seconds before modifying the shapefile
-              setTimeout(() => {
-                console.log("Modifying shapefile after 5 seconds...");
-                modifyShapefile(shapeNode, 0x00ff00, 5);
-              }, 5000);
+              const xSlider = document.getElementById("x_slider");
+              const ySlider = document.getElementById("y_slider");
+              const zShift = 5; // Initial zShift value, can be dynamic if needed
+
+              const updateShapefilePosition = () => {
+                const newX = parseFloat(xSlider.value);
+                const newY = parseFloat(ySlider.value);
+                console.log(
+                  "Updating shapefile position with slider values..."
+                );
+                modifyShapefile(shapeNode, 0x00ff00, newX, newY, zShift);
+              };
+
+              // Attach event listeners to sliders
+              xSlider.addEventListener("input", updateShapefilePosition);
+              ySlider.addEventListener("input", updateShapefilePosition);
             })();
             // await loadShapefile(
             //   "/examples/kalvaria_pcd/convex_hulls.shp",
