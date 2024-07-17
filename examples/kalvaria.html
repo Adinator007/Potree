@@ -309,10 +309,52 @@
               }
             };
 
-            await loadShapefile(
-              "/examples/kalvaria_pcd/tree_height_lines.shp",
-              new THREE.Color(0.3, 0.3, 1)
-            );
+            const modifyShapefile = (shapefileNode, newColor, newZShift) => {
+              console.log(
+                "Starting to modify shapefile...",
+                newColor,
+                newZShift
+              );
+
+              shapefileNode.traverse((node) => {
+                console.log("Traversing node:", node);
+
+                if (node.isObject3D) {
+                  console.log(
+                    "Node is a THREE.Object3D instance. Modifying position..."
+                  );
+                  node.position.z += newZShift;
+                  console.log(`New Z position: ${node.position.z}`);
+                  node.updateMatrixWorld(true);
+                } else {
+                  console.log("Node is not a THREE.Object3D instance.");
+                }
+
+                if (node.material) {
+                  console.log("Node has material. Changing color...");
+                  node.material.color.set(newColor);
+                  console.log(`New color: ${node.material.color.getStyle()}`);
+                } else {
+                  console.log("Node does not have material.");
+                }
+              });
+
+              console.log("Finished modifying shapefile.");
+            };
+
+            // Usage example
+            (async () => {
+              await loadShapefile(
+                "/examples/kalvaria_pcd/tree_height_lines.shp",
+                new THREE.Color(0.3, 0.3, 1)
+              );
+
+              // Delay for 5 seconds before modifying the shapefile
+              setTimeout(() => {
+                console.log("Modifying shapefile after 5 seconds...");
+                modifyShapefile(shapeNode, 0x00ff00, 5);
+              }, 5000);
+            })();
             // await loadShapefile(
             //   "/examples/kalvaria_pcd/convex_hulls.shp",
             //   new THREE.Color(1, 0, 0)
