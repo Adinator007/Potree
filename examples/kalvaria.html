@@ -143,14 +143,18 @@
                 `Coordinates for selected tree ID (${selectedTreeId}):`,
                 { x, y, z }
               );
-              const radius = parseFloat(document.getElementById("radius_slider").value);
+              const radius = parseFloat(
+                document.getElementById("radius_slider").value
+              );
               updateVolumePosition(new THREE.Vector3(x, y, z), radius);
             }
           });
         };
 
         const updateVolumePosition = (center, radius) => {
-          console.log(`Updating volume position with center: ${center}, radius: ${radius}`);
+          console.log(
+            `Updating volume position with center: ${center}, radius: ${radius}`
+          );
 
           if (volume) {
             volume.position.set(center.x, center.y, center.z);
