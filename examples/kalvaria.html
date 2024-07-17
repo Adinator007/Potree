@@ -62,6 +62,7 @@
 
       let selectedTreeId = null;
       let volume = null;
+      let originalPositions = {};
 
       window.viewer = new Potree.Viewer(
         document.getElementById("potree_render_area")
@@ -295,6 +296,14 @@
                     if (node.material) {
                       node.material.color.set(color);
                     }
+                    if (node.isObject3D) {
+                      // Save original positions
+                      originalPositions[node.uuid] = {
+                        x: node.position.x,
+                        y: node.position.y,
+                        z: node.position.z,
+                      };
+                    }
                   });
 
                   shapeNode.add(shpPoints.node);
@@ -312,9 +321,9 @@
             const modifyShapefile = (
               shapefileNode,
               newColor,
-              newX,
-              newY,
-              newZShift
+              deltaX,
+              deltaY,
+              deltaZShift
             ) => {
               console.log("Starting to modify shapefile...");
 
@@ -325,11 +334,16 @@
                   console.log(
                     "Node is a THREE.Object3D instance. Modifying position..."
                   );
-                  node.position.set(newX, newY, newZShift);
-                  console.log(
-                    `New position: x=${node.position.x}, y=${node.position.y}, z=${node.position.z}`
-                  );
-                  node.updateMatrixWorld(true);
+                  const originalPosition = originalPositions[node.uuid];
+                  if (originalPosition) {
+                    node.position.x = originalPosition.x + deltaX;
+                    node.position.y = originalPosition.y + deltaY;
+                    node.position.z = originalPosition.z + deltaZShift;
+                    console.log(
+                      `New position: x=${node.position.x}, y=${node.position.y}, z=${node.position.z}`
+                    );
+                    node.updateMatrixWorld(true);
+                  }
                 } else {
                   console.log("Node is not a THREE.Object3D instance.");
                 }
