@@ -61,6 +61,7 @@
       import * as THREE from "../libs/three.js/build/three.module.js";
 
       let selectedTreeId = null;
+      let volume = null;
 
       window.viewer = new Potree.Viewer(
         document.getElementById("potree_render_area")
@@ -142,57 +143,22 @@
                 `Coordinates for selected tree ID (${selectedTreeId}):`,
                 { x, y, z }
               );
-              filterPointCloud(new THREE.Vector3(x, y, z), 5); // Filter 5x5x5 cube
+              const radius = parseFloat(document.getElementById("radius_slider").value);
+              updateVolumePosition(new THREE.Vector3(x, y, z), radius);
             }
           });
         };
 
-        const logObjectRecursively = (obj, depth = 0, parentKey = "") => {
-          const indent = " ".repeat(depth * 2);
-          for (const key in obj) {
-            if (obj.hasOwnProperty(key)) {
-              const value = obj[key];
-              const type = typeof value;
-              console.log(`${indent}${parentKey}${key} (${type}):`, value);
-              if (type === "object" && value !== null) {
-                logObjectRecursively(value, depth + 1, `${parentKey}${key}.`);
-              }
-            }
+        const updateVolumePosition = (center, radius) => {
+          console.log(`Updating volume position with center: ${center}, radius: ${radius}`);
+
+          if (volume) {
+            volume.position.set(center.x, center.y, center.z);
+            volume.scale.set(radius * 2, radius * 2, radius * 50);
+            viewer.setClipTask(Potree.ClipTask.SHOW_INSIDE);
           }
         };
 
-        const filterPointCloud = (center, radius) => {
-          console.log(
-            `Filtering point cloud with center: ${center}, radius: ${radius}`
-          );
-
-          const box = new THREE.Box3(
-            new THREE.Vector3(
-              center.x - radius,
-              center.y - radius,
-              center.z - radius
-            ),
-            new THREE.Vector3(
-              center.x + radius,
-              center.y + radius,
-              center.z + radius
-            )
-          );
-
-          console.log("Created bounding box:", box);
-
-          viewer.scene.pointclouds.forEach((pointcloud, pointcloudIndex) => {
-            console.log(
-              `Processing point cloud ${pointcloudIndex + 1}/${
-                viewer.scene.pointclouds.length
-              }`,
-              pointcloud
-            );
-          });
-
-          console.log("Dispatching visibility_changed event.");
-          viewer.scene.dispatchEvent({ type: "visibility_changed" });
-        };
         document
           .getElementById("submit_button")
           .addEventListener("click", () => {
@@ -210,7 +176,7 @@
                 selectedTree.y,
                 selectedTree.z
               );
-              filterPointCloud(center, radius);
+              updateVolumePosition(center, radius);
             }
           });
 
@@ -220,6 +186,21 @@
             document.getElementById(
               "radius_value"
             ).textContent = `${event.target.value}m`;
+
+            if (selectedTreeId) {
+              const selectedTree = treeData.find(
+                (tree) => tree.id === selectedTreeId
+              );
+              if (selectedTree) {
+                const center = new THREE.Vector3(
+                  selectedTree.x,
+                  selectedTree.y,
+                  selectedTree.z
+                );
+                const radius = parseFloat(event.target.value);
+                updateVolumePosition(center, radius);
+              }
+            }
           });
 
         parseTreeData("/examples/kalvaria_pcd/torzs_koordinatak_plusz.txt");
@@ -247,7 +228,6 @@
             let pointcloud = e.pointcloud;
             let center = pointcloud.position;
 
-            // Log point cloud position and bounding box
             console.log("Point cloud position:", pointcloud.position);
             console.log("Point cloud boundingBox:", pointcloud.boundingBox);
 
@@ -256,26 +236,21 @@
             pointMaterial.pointSizeType = Potree.PointSizeType.ADAPTIVE;
             pointMaterial.uniforms.uShadowColor.value = [0.0, 0, 0];
 
-            // Use point cloud's position for initial camera view
             console.log("Point cloud center position:", center);
 
-            // Set initial camera view based on the point cloud's position
-            viewer.scene.view.position.set(center.x, center.y, center.z + 100); // Adjust distance as necessary
+            viewer.scene.view.position.set(center.x, center.y, center.z + 100);
             viewer.scene.view.lookAt(center);
 
             viewer.scene.addPointCloud(pointcloud);
 
-            // Ensure point cloud nodes are visible
             if (pointcloud.nodes) {
               pointcloud.nodes.traverse((node) => {
                 node.visible = true;
               });
             }
 
-            // Define the z-direction shift amount
-            const zShiftAmount = offset[2] + 7; // Adjust this value as necessary
+            const zShiftAmount = offset[2] + 7;
 
-            // Load and add shapefiles
             const loader = new Potree.ShapefileLoader();
 
             const loadShapefile = async (path, color, zShift = 0) => {
@@ -283,8 +258,7 @@
                 const shpPoints = await loader.load(path);
 
                 if (shpPoints && shpPoints.node) {
-                  // Apply transformation to shapefile coordinates
-                  shpPoints.node.position.set(0, 0, zShift); // Set position to offset and apply z shift
+                  shpPoints.node.position.set(0, 0, zShift);
                   shpPoints.node.updateMatrixWorld(true);
                   console.log("SHAPE type: ", shpPoints);
 
@@ -306,7 +280,6 @@
               }
             };
 
-            // Load the specified shapefiles with distinct colors
             await loadShapefile(
               "/examples/kalvaria_pcd/tree_height_lines.shp",
               new THREE.Color(0.3, 0.3, 1)
@@ -321,9 +294,8 @@
               zShiftAmount
             );
 
-            // Define and add volumes for cropping
             const addVolume = (name, scale, position, visible) => {
-              let volume = new Potree.BoxVolume();
+              volume = new Potree.BoxVolume();
               volume.name = name;
               volume.scale.set(scale.x, scale.y, scale.z);
               volume.position.set(position.x, position.y, position.z);
@@ -333,25 +305,15 @@
               viewer.scene.addVolume(volume);
             };
 
-            // Define the bounding box dimensions based on the center of the point cloud
-            const scale = { x: 50, y: 50, z: 100 }; // Adjust these values as necessary
+            const scale = { x: 50, y: 50, z: 1000 };
             const positionVisible = {
               x: center.x,
               y: center.y,
               z: center.z,
             };
-            // todo: remove
-            console.log("Is the position not changing??", positionVisible);
-            const positionInvisible = {
-              x: center.x - 200, // Adjust these values as necessary
-              y: center.y,
-              z: center.z,
-            };
 
-            // Add visible volume
             addVolume("Visible", scale, positionVisible, true);
 
-            // Set the clip task to show inside the volumes
             viewer.setClipTask(Potree.ClipTask.SHOW_INSIDE);
           });
         } catch (error) {
@@ -372,7 +334,6 @@
       });
 
       viewer.onGUILoaded(() => {
-        // Add entry to object list in sidebar
         let tree = $(`#jstree_scene`);
         let parentNode = "other";
 
