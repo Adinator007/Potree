@@ -85,17 +85,26 @@
       `);
         let content = section.last();
         content.html(`
-        <div class="pv-menu-list">
-          <label for="tree_id">Tree ID:</label>
-          <select id="tree_id"></select>
-          <br /><br />
-          <label for="radius_slider">Vicinity Radius (1-25m):</label>
-          <input type="range" id="radius_slider" min="1" max="25" value="10" />
-          <span id="radius_value">10m</span>
-          <br /><br />
-          <button id="submit_button">Visualize</button>
-        </div>
-      `);
+    <div class="pv-menu-list">
+      <label for="tree_id">Tree ID:</label>
+      <select id="tree_id"></select>
+      <br /><br />
+      <label for="radius_slider">Vicinity Radius (1-25m):</label>
+      <input type="range" id="radius_slider" min="1" max="25" value="10" />
+      <span id="radius_value">10m</span>
+      <br /><br />
+      <label for="x_slider">X Coordinate (-100 to 100):</label>
+      <input type="range" id="x_slider" min="-100" max="100" value="0" />
+      <span id="x_value">0</span>
+      <br /><br />
+      <label for="y_slider">Y Coordinate (-100 to 100):</label>
+      <input type="range" id="y_slider" min="-100" max="100" value="0" />
+      <span id="y_value">0</span>
+      <br /><br />
+      <button id="submit_button">Visualize</button>
+    </div>
+  `);
+
         section.first().click(() => content.slideToggle());
         section.insertBefore($("#menu_about"));
 
@@ -288,15 +297,15 @@
               "/examples/kalvaria_pcd/tree_height_lines.shp",
               new THREE.Color(0.3, 0.3, 1)
             );
-            await loadShapefile(
-              "/examples/kalvaria_pcd/convex_hulls.shp",
-              new THREE.Color(1, 0, 0)
-            );
-            await loadShapefile(
-              "/examples/kalvaria_pcd/FaKoronaPoligonok.shp",
-              new THREE.Color(0, 1, 0),
-              zShiftAmount
-            );
+            // await loadShapefile(
+            //   "/examples/kalvaria_pcd/convex_hulls.shp",
+            //   new THREE.Color(1, 0, 0)
+            // );
+            // await loadShapefile(
+            //   "/examples/kalvaria_pcd/FaKoronaPoligonok.shp",
+            //   new THREE.Color(0, 1, 0),
+            //   zShiftAmount
+            // );
 
             const addVolume = (name, scale, position, visible) => {
               volume = new Potree.BoxVolume();
