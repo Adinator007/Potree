@@ -63,6 +63,7 @@
       let selectedTreeId = null;
       let volume = null;
       let shapeNode = new THREE.Group();
+      let offsetZ = 0;
 
       window.viewer = new Potree.Viewer(
         document.getElementById("potree_render_area")
@@ -94,8 +95,8 @@
           <input type="range" id="radius_slider" min="1" max="25" value="10" />
           <span id="radius_value">10m</span>
           <br /><br />
-          <label for="z_shift_slider">Z Coordinate Shift (0-500):</label>
-          <input type="range" id="z_shift_slider" min="0" max="500" value="0" />
+          <label for="z_shift_slider">Z Coordinate Shift:</label>
+          <input type="range" id="z_shift_slider" value="0" />
           <span id="z_shift_value">0</span>
           <br /><br />
           <button id="submit_button">Visualize</button>
@@ -277,6 +278,14 @@
             const response = await fetch(url);
             const metadata = await response.json();
             const offset = metadata.offset;
+
+            // Set the z_shift_slider range dynamically based on offset[2]
+            const zShiftSlider = document.getElementById("z_shift_slider");
+            offsetZ = offset[2];
+            zShiftSlider.min = offsetZ - 50;
+            zShiftSlider.max = offsetZ + 100;
+            zShiftSlider.value = offsetZ;
+            document.getElementById("z_shift_value").textContent = zShiftSlider.value;
 
             Potree.loadPointCloud(url, name, async function (e) {
               if (!e.pointcloud) {
