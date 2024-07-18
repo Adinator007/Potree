@@ -62,7 +62,7 @@
 
       let selectedTreeId = null;
       let volume = null;
-      let originalPositions = {};
+      let shapeNode = new THREE.Group();
 
       window.viewer = new Potree.Viewer(
         document.getElementById("potree_render_area")
@@ -86,26 +86,21 @@
       `);
         let content = section.last();
         content.html(`
-    <div class="pv-menu-list">
-      <label for="tree_id">Tree ID:</label>
-      <select id="tree_id"></select>
-      <br /><br />
-      <label for="radius_slider">Vicinity Radius (1-25m):</label>
-      <input type="range" id="radius_slider" min="1" max="25" value="10" />
-      <span id="radius_value">10m</span>
-      <br /><br />
-      <label for="x_slider">X Coordinate (-100 to 100):</label>
-      <input type="range" id="x_slider" min="-100" max="100" value="0" />
-      <span id="x_value">0</span>
-      <br /><br />
-      <label for="y_slider">Y Coordinate (-100 to 100):</label>
-      <input type="range" id="y_slider" min="-100" max="100" value="0" />
-      <span id="y_value">0</span>
-      <br /><br />
-      <button id="submit_button">Visualize</button>
-    </div>
-  `);
-
+        <div class="pv-menu-list">
+          <label for="tree_id">Tree ID:</label>
+          <select id="tree_id"></select>
+          <br /><br />
+          <label for="radius_slider">Vicinity Radius (1-25m):</label>
+          <input type="range" id="radius_slider" min="1" max="25" value="10" />
+          <span id="radius_value">10m</span>
+          <br /><br />
+          <label for="z_shift_slider">Z Coordinate Shift (0-500):</label>
+          <input type="range" id="z_shift_slider" min="0" max="500" value="0" />
+          <span id="z_shift_value">0</span>
+          <br /><br />
+          <button id="submit_button">Visualize</button>
+        </div>
+      `);
         section.first().click(() => content.slideToggle());
         section.insertBefore($("#menu_about"));
 
@@ -153,24 +148,71 @@
                 `Coordinates for selected tree ID (${selectedTreeId}):`,
                 { x, y, z }
               );
-              const radius = parseFloat(
-                document.getElementById("radius_slider").value
-              );
+              const radius = parseFloat(document.getElementById("radius_slider").value);
               updateVolumePosition(new THREE.Vector3(x, y, z), radius);
+
+              // Update shapefiles based on the selected tree ID
+              updateShapefiles(selectedTreeId);
             }
           });
         };
 
         const updateVolumePosition = (center, radius) => {
-          console.log(
-            `Updating volume position with center: ${center}, radius: ${radius}`
-          );
+          console.log(`Updating volume position with center: ${center}, radius: ${radius}`);
 
           if (volume) {
             volume.position.set(center.x, center.y, center.z);
             volume.scale.set(radius * 2, radius * 2, radius * 50);
             viewer.setClipTask(Potree.ClipTask.SHOW_INSIDE);
           }
+        };
+
+        const loadShapefile = async (path, color, zShift = 0) => {
+          try {
+            const loader = new Potree.ShapefileLoader();
+            const shpPoints = await loader.load(path);
+
+            if (shpPoints && shpPoints.node) {
+              shpPoints.node.position.set(0, 0, zShift);
+              shpPoints.node.updateMatrixWorld(true);
+              console.log("SHAPE type: ", shpPoints);
+
+              shpPoints.node.traverse((node) => {
+                if (node.material) {
+                  node.material.color.set(color);
+                }
+              });
+
+              shapeNode.add(shpPoints.node);
+              viewer.scene.scene.add(shapeNode); // Ensure shapeNode is added to the scene
+            } else {
+              console.error(
+                "Loaded shapefile node is not a THREE.Object3D instance or is undefined:",
+                shpPoints.node
+              );
+            }
+          } catch (error) {
+            console.error(`Error loading shapefile (${path}):`, error);
+          }
+        };
+
+        const updateShapefiles = async (treeId) => {
+          shapeNode.clear(); // Clear previous shapefiles
+
+          await loadShapefile(
+            `/outputs/${treeId}/${treeId}_height.shp`,
+            new THREE.Color(0.3, 0.3, 1)
+          );
+          await loadShapefile(
+            `/outputs/${treeId}/${treeId}_stem_diameters.shp`,
+            new THREE.Color(1, 0, 0)
+          );
+          const zShift = parseFloat(document.getElementById("z_shift_slider").value);
+          await loadShapefile(
+            `/outputs/${treeId}/${treeId}_polygon.shp`,
+            new THREE.Color(0, 1, 0),
+            zShift
+          );
         };
 
         document
@@ -218,248 +260,120 @@
           });
 
         document
-          .getElementById("x_slider")
+          .getElementById("z_shift_slider")
           .addEventListener("input", (event) => {
-            document.getElementById(
-              "x_value"
-            ).textContent = `${event.target.value}`;
-          });
+            document.getElementById("z_shift_value").textContent = `${event.target.value}`;
 
-        document
-          .getElementById("y_slider")
-          .addEventListener("input", (event) => {
-            document.getElementById(
-              "y_value"
-            ).textContent = `${event.target.value}`;
+            if (selectedTreeId) {
+              updateShapefiles(selectedTreeId);
+            }
           });
 
         parseTreeData("/examples/kalvaria_pcd/torzs_koordinatak_plusz.txt");
-      });
 
-      // Define shapeNode
-      const shapeNode = new THREE.Group();
-      viewer.scene.scene.add(shapeNode);
+        // Load your point cloud
+        const loadPointCloud = async (url, name) => {
+          try {
+            const response = await fetch(url);
+            const metadata = await response.json();
+            const offset = metadata.offset;
 
-      // Load your point cloud
-      const loadPointCloud = async (url, name) => {
-        try {
-          const response = await fetch(url);
-          const metadata = await response.json();
-          const offset = metadata.offset;
-
-          Potree.loadPointCloud(url, name, async function (e) {
-            if (!e.pointcloud) {
-              console.error("Failed to load point cloud");
-              return;
-            }
-
-            console.log("Point cloud loaded successfully", e.pointcloud);
-
-            let pointcloud = e.pointcloud;
-            let center = pointcloud.position;
-
-            console.log("Point cloud position:", pointcloud.position);
-            console.log("Point cloud boundingBox:", pointcloud.boundingBox);
-
-            let pointMaterial = pointcloud.material;
-            pointMaterial.size = 1;
-            pointMaterial.pointSizeType = Potree.PointSizeType.ADAPTIVE;
-            pointMaterial.uniforms.uShadowColor.value = [0.0, 0, 0];
-
-            console.log("Point cloud center position:", center);
-
-            viewer.scene.view.position.set(center.x, center.y, center.z + 100);
-            viewer.scene.view.lookAt(center);
-
-            viewer.scene.addPointCloud(pointcloud);
-
-            if (pointcloud.nodes) {
-              pointcloud.nodes.traverse((node) => {
-                node.visible = true;
-              });
-            }
-
-            const zShiftAmount = offset[2] + 7;
-
-            const loader = new Potree.ShapefileLoader();
-
-            const loadShapefile = async (path, color, zShift = 0) => {
-              try {
-                const shpPoints = await loader.load(path);
-
-                if (shpPoints && shpPoints.node) {
-                  shpPoints.node.position.set(0, 0, zShift);
-                  shpPoints.node.updateMatrixWorld(true);
-                  console.log("SHAPE type: ", shpPoints);
-
-                  shpPoints.node.traverse((node) => {
-                    if (node.material) {
-                      node.material.color.set(color);
-                    }
-                    if (node.isObject3D) {
-                      // Save original positions
-                      originalPositions[node.uuid] = {
-                        x: node.position.x,
-                        y: node.position.y,
-                        z: node.position.z,
-                      };
-                    }
-                  });
-
-                  shapeNode.add(shpPoints.node);
-                } else {
-                  console.error(
-                    "Loaded shapefile node is not a THREE.Object3D instance or is undefined:",
-                    shpPoints.node
-                  );
-                }
-              } catch (error) {
-                console.error(`Error loading shapefile (${path}):`, error);
-              }
-            };
-
-            const modifyShapefile = (
-              shapefileNode,
-              newColor,
-              deltaX,
-              deltaY,
-              deltaZShift
-            ) => {
-              console.log("Starting to modify shapefile...");
-
-              let maxZNode = null;
-              let maxZValue = -Infinity;
-
-              shapefileNode.traverse((node) => {
-                if (node.isObject3D && originalPositions[node.uuid]) {
-                  const originalPosition = originalPositions[node.uuid];
-                  if (originalPosition.z > maxZValue) {
-                    maxZValue = originalPosition.z;
-                    maxZNode = node;
-                  }
-                }
-              });
-
-              if (maxZNode) {
-                const originalPosition = originalPositions[maxZNode.uuid];
-                maxZNode.position.x = originalPosition.x + deltaX;
-                maxZNode.position.y = originalPosition.y + deltaY;
-                maxZNode.position.z = originalPosition.z + deltaZShift;
-                console.log(
-                  `New position of top node: x=${maxZNode.position.x}, y=${maxZNode.position.y}, z=${maxZNode.position.z}`
-                );
-                maxZNode.updateMatrixWorld(true);
-
-                if (maxZNode.material) {
-                  maxZNode.material.color.set(newColor);
-                  console.log(
-                    `New color of top node: ${maxZNode.material.color.getStyle()}`
-                  );
-                }
-              } else {
-                console.log("No top node found to modify.");
+            Potree.loadPointCloud(url, name, async function (e) {
+              if (!e.pointcloud) {
+                console.error("Failed to load point cloud");
+                return;
               }
 
-              console.log("Finished modifying shapefile.");
-            };
+              console.log("Point cloud loaded successfully", e.pointcloud);
 
-            // Usage example
-            (async () => {
-              await loadShapefile(
-                "/examples/kalvaria_pcd/tree_height_lines.shp",
-                new THREE.Color(0.3, 0.3, 1)
-              );
+              let pointcloud = e.pointcloud;
+              let center = pointcloud.position;
 
-              const xSlider = document.getElementById("x_slider");
-              const ySlider = document.getElementById("y_slider");
-              const zShift = 0; // Initial zShift value, can be dynamic if needed
+              console.log("Point cloud position:", pointcloud.position);
+              console.log("Point cloud boundingBox:", pointcloud.boundingBox);
 
-              const updateShapefilePosition = () => {
-                const newX = parseFloat(xSlider.value);
-                const newY = parseFloat(ySlider.value);
-                console.log(
-                  "Updating shapefile position with slider values..."
-                );
-                modifyShapefile(shapeNode, 0x00ff00, newX, newY, zShift);
+              let pointMaterial = pointcloud.material;
+              pointMaterial.size = 1;
+              pointMaterial.pointSizeType = Potree.PointSizeType.ADAPTIVE;
+              pointMaterial.uniforms.uShadowColor.value = [0.0, 0, 0];
+
+              console.log("Point cloud center position:", center);
+
+              viewer.scene.view.position.set(center.x, center.y, center.z + 100);
+              viewer.scene.view.lookAt(center);
+
+              viewer.scene.addPointCloud(pointcloud);
+
+              if (pointcloud.nodes) {
+                pointcloud.nodes.traverse((node) => {
+                  node.visible = true;
+                });
+              }
+
+              const addVolume = (name, scale, position, visible) => {
+                volume = new Potree.BoxVolume();
+                volume.name = name;
+                volume.scale.set(scale.x, scale.y, scale.z);
+                volume.position.set(position.x, position.y, position.z);
+                volume.clip = true;
+                volume.visible = visible;
+
+                viewer.scene.addVolume(volume);
               };
 
-              // Attach event listeners to sliders
-              xSlider.addEventListener("input", updateShapefilePosition);
-              ySlider.addEventListener("input", updateShapefilePosition);
-            })();
-            // await loadShapefile(
-            //   "/examples/kalvaria_pcd/convex_hulls.shp",
-            //   new THREE.Color(1, 0, 0)
-            // );
-            // await loadShapefile(
-            //   "/examples/kalvaria_pcd/FaKoronaPoligonok.shp",
-            //   new THREE.Color(0, 1, 0),
-            //   zShiftAmount
-            // );
+              const scale = { x: 50, y: 50, z: 1000 };
+              const positionVisible = {
+                x: center.x,
+                y: center.y,
+                z: center.z,
+              };
 
-            const addVolume = (name, scale, position, visible) => {
-              volume = new Potree.BoxVolume();
-              volume.name = name;
-              volume.scale.set(scale.x, scale.y, scale.z);
-              volume.position.set(position.x, position.y, position.z);
-              volume.clip = true;
-              volume.visible = visible;
+              addVolume("Visible", scale, positionVisible, true);
 
-              viewer.scene.addVolume(volume);
-            };
+              viewer.setClipTask(Potree.ClipTask.SHOW_INSIDE);
+            });
+          } catch (error) {
+            console.error("Failed to load point cloud", error);
+          }
+        };
 
-            const scale = { x: 50, y: 50, z: 1000 };
-            const positionVisible = {
-              x: center.x,
-              y: center.y,
-              z: center.z,
-            };
+        loadPointCloud("/examples/kalvaria_pcd/metadata.json", "Kalvaria");
 
-            addVolume("Visible", scale, positionVisible, true);
+        viewer.addEventListener("update", () => {
+          const size = viewer.renderer.getSize(new THREE.Vector2());
 
-            viewer.setClipTask(Potree.ClipTask.SHOW_INSIDE);
+          shapeNode.traverse((node) => {
+            if (node.setResolution) {
+              node.setResolution(size.width, size.height);
+            }
           });
-        } catch (error) {
-          console.error("Failed to load point cloud", error);
-        }
-      };
-
-      loadPointCloud("/examples/kalvaria_pcd/metadata.json", "Kalvaria");
-
-      viewer.addEventListener("update", () => {
-        const size = viewer.renderer.getSize(new THREE.Vector2());
-
-        shapeNode.traverse((node) => {
-          if (node.setResolution) {
-            node.setResolution(size.width, size.height);
-          }
         });
-      });
 
-      viewer.onGUILoaded(() => {
-        let tree = $(`#jstree_scene`);
-        let parentNode = "other";
+        viewer.onGUILoaded(() => {
+          let tree = $(`#jstree_scene`);
+          let parentNode = "other";
 
-        shapeNode.traverse((node) => {
-          if (node instanceof THREE.Object3D) {
-            let shapefileID = tree.jstree(
-              "create_node",
-              parentNode,
-              {
-                text: "tree_height_lines",
-                icon: `${Potree.resourcePath}/icons/triangle.svg`,
-                object: node,
-                data: node,
-              },
-              "last",
-              false,
-              false
-            );
-            tree.jstree(
-              node.visible ? "check_node" : "uncheck_node",
-              shapefileID
-            );
-          }
+          shapeNode.traverse((node) => {
+            if (node instanceof THREE.Object3D) {
+              let shapefileID = tree.jstree(
+                "create_node",
+                parentNode,
+                {
+                  text: "tree_height_lines",
+                  icon: `${Potree.resourcePath}/icons/triangle.svg`,
+                  object: node,
+                  data: node,
+                },
+                "last",
+                false,
+                false
+              );
+              tree.jstree(
+                node.visible ? "check_node" : "uncheck_node",
+                shapefileID
+              );
+            }
+          });
         });
       });
     </script>
