@@ -1,205 +1,221 @@
-
 const path = require('path');
 const gulp = require('gulp');
 const exec = require('child_process').exec;
-
 const fs = require("fs");
 const fsp = fs.promises;
 const concat = require('gulp-concat');
 const connect = require('gulp-connect');
-const {watch} = gulp;
+const bodyParser = require('body-parser');
+const { watch } = require('gulp');
 
-const {createExamplesPage} = require("./src/tools/create_potree_page");
-const {createGithubPage} = require("./src/tools/create_github_page");
-const {createIconsPage} = require("./src/tools/create_icons_page");
-
+const { createExamplesPage } = require("./src/tools/create_potree_page");
+const { createGithubPage } = require("./src/tools/create_github_page");
+const { createIconsPage } = require("./src/tools/create_icons_page");
 
 let paths = {
-	laslaz: [
-		"build/workers/laslaz-worker.js",
-		"build/workers/lasdecoder-worker.js",
-	],
-	html: [
-		"src/viewer/potree.css",
-		"src/viewer/sidebar.html",
-		"src/viewer/profile.html"
-	],
-	resources: [
-		"resources/**/*"
-	]
+    laslaz: [
+        "build/workers/laslaz-worker.js",
+        "build/workers/lasdecoder-worker.js",
+    ],
+    html: [
+        "src/viewer/potree.css",
+        "src/viewer/sidebar.html",
+        "src/viewer/profile.html"
+    ],
+    resources: [
+        "resources/**/*"
+    ]
 };
 
 let workers = {
-	"LASLAZWorker": [
-		"libs/plasio/workers/laz-perf.js",
-		"libs/plasio/workers/laz-loader-worker.js"
-	],
-	"LASDecoderWorker": [
-		"src/workers/LASDecoderWorker.js"
-	],
-	"EptLaszipDecoderWorker": [
-		"libs/copc/index.js",
-		"src/workers/EptLaszipDecoderWorker.js",
-	],
-	"EptBinaryDecoderWorker": [
-		"libs/ept/ParseBuffer.js",
-		"src/workers/EptBinaryDecoderWorker.js"
-	],
-	"EptZstandardDecoderWorker": [
-		"src/workers/EptZstandardDecoder_preamble.js",
-		'libs/zstd-codec/bundle.js',
-		"libs/ept/ParseBuffer.js",
-		"src/workers/EptZstandardDecoderWorker.js"
-	]
+    "LASLAZWorker": [
+        "libs/plasio/workers/laz-perf.js",
+        "libs/plasio/workers/laz-loader-worker.js"
+    ],
+    "LASDecoderWorker": [
+        "src/workers/LASDecoderWorker.js"
+    ],
+    "EptLaszipDecoderWorker": [
+        "libs/copc/index.js",
+        "src/workers/EptLaszipDecoderWorker.js"
+    ],
+    "EptBinaryDecoderWorker": [
+        "libs/ept/ParseBuffer.js",
+        "src/workers/EptBinaryDecoderWorker.js"
+    ],
+    "EptZstandardDecoderWorker": [
+        "src/workers/EptZstandardDecoder_preamble.js",
+        'libs/zstd-codec/bundle.js',
+        "libs/ept/ParseBuffer.js",
+        "src/workers/EptZstandardDecoderWorker.js"
+    ]
 };
 
 // these libs are lazily loaded
 // in order for the lazy loader to find them, independent of the path of the html file,
 // we package them together with potree
 let lazyLibs = {
-	"geopackage": "libs/geopackage",
-	"sql.js": "libs/sql.js"
+    "geopackage": "libs/geopackage",
+    "sql.js": "libs/sql.js"
 };
 
 let shaders = [
-	"src/materials/shaders/pointcloud.vs",
-	"src/materials/shaders/pointcloud.fs",
-	"src/materials/shaders/pointcloud_sm.vs",
-	"src/materials/shaders/pointcloud_sm.fs",
-	"src/materials/shaders/normalize.vs",
-	"src/materials/shaders/normalize.fs",
-	"src/materials/shaders/normalize_and_edl.fs",
-	"src/materials/shaders/edl.vs",
-	"src/materials/shaders/edl.fs",
-	"src/materials/shaders/blur.vs",
-	"src/materials/shaders/blur.fs",
+    "src/materials/shaders/pointcloud.vs",
+    "src/materials/shaders/pointcloud.fs",
+    "src/materials/shaders/pointcloud_sm.vs",
+    "src/materials/shaders/pointcloud_sm.fs",
+    "src/materials/shaders/normalize.vs",
+    "src/materials/shaders/normalize.fs",
+    "src/materials/shaders/normalize_and_edl.fs",
+    "src/materials/shaders/edl.vs",
+    "src/materials/shaders/edl.fs",
+    "src/materials/shaders/blur.vs",
+    "src/materials/shaders/blur.fs",
 ];
 
-// For development, it is now possible to use 'gulp webserver'
-// from the command line to start the server (default port is 8080)
-gulp.task('webserver', gulp.series(async function() {
-	server = connect.server({
-		port: 1234,
-		https: false,
-	});
+// Add this middleware to log incoming requests
+const logRequest = (req, _res, next) => {
+    console.log(`Received ${req.method} request for ${req.url}`);
+    next();
+};
+
+// Start the server with logging middleware
+gulp.task('webserver', gulp.series(async function () {
+    console.log("middleware");
+    server = connect.server({
+        port: 1234,
+        https: false,
+		middleware: function (_connect, _opt) {
+			return [
+				logRequest,
+				bodyParser.json(),
+				async function (req, res, next) {
+					if (req.method === 'POST' && req.url === '/update-json') {
+						console.log("POST request received with data:", req.body);
+						const { treeId, data } = req.body;
+		
+						const dir = path.join(__dirname, 'outputs', treeId);
+						const filePath = path.join(dir, `${treeId}_measurements.json`);
+		
+						try {
+							await fsp.mkdir(dir, { recursive: true });
+							await fsp.access(dir, fs.constants.W_OK);
+							await fsp.writeFile(filePath, JSON.stringify(data, null, 2));
+		
+							console.log('File updated successfully:', filePath);
+							res.writeHead(200, {'Content-Type': 'application/json'});
+							res.end(JSON.stringify({ message: 'File updated successfully' }));
+						} catch (err) {
+							console.error('Server error:', err);
+							res.writeHead(500, {'Content-Type': 'application/json'});
+							res.end(JSON.stringify({ error: 'Server error', details: err.message }));
+						}
+					} else {
+						next();
+					}
+				}
+			];
+		}
+		
+    });
 }));
 
-gulp.task('examples_page', async function(done) {
-	await Promise.all([
-		createExamplesPage(),
-		createGithubPage(),
-	]);
+gulp.task('examples_page', async function (done) {
+    await Promise.all([
+        createExamplesPage(),
+        createGithubPage(),
+    ]);
 
-	done();
+    done();
 });
 
-gulp.task('icons_viewer', async function(done) {
-	await createIconsPage();
+gulp.task('icons_viewer', async function (done) {
+    await createIconsPage();
 
-	done();
-
+    done();
 });
 
-gulp.task('test', async function() {
-
-	console.log("asdfiae8ofh");
-
+gulp.task('test', async function () {
+    console.log("Test task executed");
 });
 
-gulp.task("workers", async function(done){
+gulp.task("workers", async function (done) {
+    for (let workerName of Object.keys(workers)) {
+        gulp.src(workers[workerName])
+            .pipe(concat(`${workerName}.js`))
+            .pipe(gulp.dest('build/potree/workers'));
+    }
 
-	for(let workerName of Object.keys(workers)){
+    gulp.src('./libs/copc/laz-perf.wasm')
+        .pipe(gulp.dest('./build/potree/workers'));
 
-		gulp.src(workers[workerName])
-			.pipe(concat(`${workerName}.js`))
-			.pipe(gulp.dest('build/potree/workers'));
-	}
-
-	gulp.src('./libs/copc/laz-perf.wasm')
-		.pipe(gulp.dest('./build/potree/workers'));
-
-	done();
+    done();
 });
 
-gulp.task("lazylibs", async function(done){
+gulp.task("lazylibs", async function (done) {
+    for (let libname of Object.keys(lazyLibs)) {
+        const libpath = lazyLibs[libname];
 
-	for(let libname of Object.keys(lazyLibs)){
-
-		const libpath = lazyLibs[libname];
-
-		gulp.src([`${libpath}/**/*`])
-			.pipe(gulp.dest(`build/potree/lazylibs/${libname}`));
-	}
-
-	done();
+        gulp.src([`${libpath}/**/*`])
+            .pipe(gulp.dest(`build/potree/lazylibs/${libname}`));
+    }
+    done();
 });
 
-gulp.task("shaders", async function(){
+gulp.task("shaders", async function () {
+    const components = [
+        "let Shaders = {};"
+    ];
 
-	const components = [
-		"let Shaders = {};"
-	];
+    for (let file of shaders) {
+        const filename = path.basename(file);
+        const content = await fsp.readFile(file);
+        const prep = `Shaders["${filename}"] = \`${content}\``;
+        components.push(prep);
+    }
 
-	for(let file of shaders){
-		const filename = path.basename(file);
+    components.push("export {Shaders};");
 
-		const content = await fsp.readFile(file);
+    const content = components.join("\n\n");
+    const targetPath = `./build/shaders/shaders.js`;
 
-		const prep = `Shaders["${filename}"] = \`${content}\``;
-
-		components.push(prep);
-	}
-
-	components.push("export {Shaders};");
-
-	const content = components.join("\n\n");
-
-	const targetPath = `./build/shaders/shaders.js`;
-
-	if(!fs.existsSync("build/shaders")){
-		fs.mkdirSync("build/shaders");
-	}
-	fs.writeFileSync(targetPath, content, {flag: "w"});
+    if (!fs.existsSync("build/shaders")) {
+        fs.mkdirSync("build/shaders");
+    }
+    fs.writeFileSync(targetPath, content, { flag: "w" });
 });
 
-gulp.task('build', 
-	gulp.series(
-		gulp.parallel("workers", "lazylibs", "shaders", "icons_viewer", "examples_page"),
-		async function(done){
-			gulp.src(paths.html).pipe(gulp.dest('build/potree'));
-
-			gulp.src(paths.resources).pipe(gulp.dest('build/potree/resources'));
-
-			gulp.src(["LICENSE"]).pipe(gulp.dest('build/potree'));
-
-			done();
-		}
-	)
+gulp.task('build',
+    gulp.series(
+        gulp.parallel("workers", "lazylibs", "shaders", "icons_viewer", "examples_page"),
+        async function (done) {
+            gulp.src(paths.html).pipe(gulp.dest('build/potree'));
+            gulp.src(paths.resources).pipe(gulp.dest('build/potree/resources'));
+            gulp.src(["LICENSE"]).pipe(gulp.dest('build/potree'));
+            done();
+        }
+    )
 );
 
-gulp.task("pack", async function(){
-	exec('rollup -c', function (err, stdout, stderr) {
-		console.log(stdout);
-		console.log(stderr);
-	});
+gulp.task("pack", async function () {
+    exec('rollup -c', function (err, stdout, stderr) {
+        console.log(stdout);
+        console.log(stderr);
+    });
 });
 
-gulp.task('watch', gulp.parallel("build", "pack", "webserver", async function() {
+gulp.task('watch', gulp.parallel("build", "pack", "webserver", async function () {
+    let watchlist = [
+        'src/**/*.js',
+        'src/**/**/*.js',
+        'src/**/*.css',
+        'src/**/*.html',
+        'src/**/*.vs',
+        'src/**/*.fs',
+        'resources/**/*',
+        'examples//**/*.json',
+        '!resources/icons/index.html',
+    ];
 
-	let watchlist = [
-		'src/**/*.js',
-		'src/**/**/*.js',
-		'src/**/*.css',
-		'src/**/*.html',
-		'src/**/*.vs',
-		'src/**/*.fs',
-		'resources/**/*',
-		'examples//**/*.json',
-		'!resources/icons/index.html',
-	];
-
-	watch(watchlist, gulp.series("build", "pack"));
-
+    watch(watchlist, gulp.series("build", "pack"));
 }));
-
-

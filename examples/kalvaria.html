@@ -69,17 +69,63 @@
         document.getElementById("potree_render_area")
       );
 
+      (
+        document.getElementById("potree_render_area")
+      );
+
+      function onMeasurementAdded(event) {
+        console.log("Event received:", event);
+        let measurement = event.measurement;
+        console.log("Measurement added of type:", measurement.type);
+        console.log("Measurement details:", measurement);
+        logMeasurements(); // Log measurements whenever a measurement is added
+      }
+
+      function onVolumeAdded(event) {
+        console.log("Volume added:", event.volume);
+        event.volume.addEventListener("volume_edited", onVolumeEdited);
+        logMeasurements(); // Log measurements whenever a volume is added
+      }
+
+      function onVolumeEdited(event) {
+        console.log("Volume edited:", event.volume);
+        logMeasurements(); // Log measurements whenever a volume is edited
+      }
+
+      viewer.scene.addEventListener("measurement_added", onMeasurementAdded);
+      viewer.scene.addEventListener("volume_added", onVolumeAdded);
+      console.log("Event listeners added for measurement_added and volume_added");
+
+      // Function to log measurements
+      function logMeasurements() {
+        const measurements = viewer.scene.measurements;
+        
+        console.log("Measurements in the scene:");
+        measurements.forEach(measurement => {
+          console.log(measurement);
+        });
+      }
+
+      // Add event listener for volume drag
+      function addVolumeDragListener(event) {
+        viewer.scene.addEventListener("drag", (event) => {
+          console.log("Volume is being dragged:", event);
+        });
+      }
+      viewer.scene.addEventListener("drag", addVolumeDragListener);
+
+
       viewer.setEDLEnabled(true);
       viewer.setFOV(60);
       viewer.setPointBudget(1_000_000);
       viewer.setMinNodeSize(0);
       viewer.loadSettingsFromURL();
-
       viewer.setDescription("");
 
       viewer.loadGUI(() => {
         viewer.setLanguage("en");
         viewer.toggleSidebar();
+
 
         let section = $(`
         <h3 id="menu_meta" class="accordion-header ui-widget"><span>Tree Selector</span></h3>
@@ -100,6 +146,8 @@
           <span id="z_shift_value">0</span>
           <br /><br />
           <button id="submit_button">Visualize</button>
+          <br /><br />
+          <button id="update_button">Update</button>
         </div>
       `);
         section.first().click(() => content.slideToggle());
@@ -216,6 +264,61 @@
           );
         };
 
+        const getUsername = () => {
+          return navigator.userAgent;
+        };
+
+
+        const getTreeMeasurements = async (measurement) => {
+          // Placeholder function to calculate measurements
+          // Implement actual calculations based on shapefile data
+          const height = measurement.height; // Example height
+          const polygonDiameter = (measurement.width + measurement.depth) / 2; // Example polygon diameter
+          const stemDiameter = 2; // Example stem diameter
+
+          return {
+            height,
+            polygonDiameter,
+            stemDiameter,
+          };
+        };
+
+        const updateJsonFile = async (treeId) => {
+          const username = navigator.userAgent;
+          const measurements = await getTreeMeasurements(treeId);
+          const date = new Date().toISOString();
+        
+          const data = {
+            username,
+            date,
+            measurements,
+          };
+        
+          console.log('Sending data to server:', { treeId, data }); // Log data being sent
+        
+          try {
+            const response = await fetch('http://localhost:1234/update-json', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ treeId, data }),
+            });
+        
+            const responseData = await response.json(); // Parse the response data
+            if (response.ok) {
+              console.log('JSON file updated successfully:', responseData);
+            } else {
+              console.error('Failed to update JSON file:', responseData);
+            }
+          } catch (error) {
+            console.error('Error during fetch operation:', error);
+          }
+        };
+        
+        
+      
+
         document
           .getElementById("submit_button")
           .addEventListener("click", () => {
@@ -270,6 +373,11 @@
             }
           });
 
+          document.getElementById("update_button").addEventListener("click", () => {
+            if (selectedTreeId) {
+              updateJsonFile(selectedTreeId);
+            }
+          });
         parseTreeData("/examples/kalvaria_pcd/torzs_koordinatak_plusz.txt");
 
         // Load your point cloud
