@@ -65,6 +65,8 @@
       let shapeNode = new THREE.Group();
       let offsetZ = 0;
       let volumeMeasurementResult = { x: 0, y: 0, z: 0 }; // Global variable to store volume measurement
+      let heightMeasurementResult = 0; // Global variable to store height measurement
+      let distanceMeasurementResult = 0; // Global variable to store distance measurement
 
       window.viewer = new Potree.Viewer(
         document.getElementById("potree_render_area")
@@ -85,6 +87,20 @@
         console.log("Volume added:", event.volume);
         logMeasurements();
         addVolumePropertyListeners(event.volume);
+      }
+
+      // Function to handle height measurement added
+      function onHeightMeasurementAdded(event) {
+        console.log("Height measurement added:", event.measurement);
+        heightMeasurementResult = event.measurement.length;
+        console.log('Height Measurement Result:', heightMeasurementResult);
+      }
+
+      // Function to handle distance measurement added
+      function onDistanceMeasurementAdded(event) {
+        console.log("Distance measurement added:", event.measurement);
+        distanceMeasurementResult = event.measurement.length;
+        console.log('Distance Measurement Result:', distanceMeasurementResult);
       }
 
       // Add listeners for volume properties
@@ -111,8 +127,10 @@
 
       // Add event listeners to the viewer's scene
       viewer.scene.addEventListener("volume_added", onVolumeAdded);
+      viewer.scene.addEventListener("measurement_added", onHeightMeasurementAdded);
+      viewer.scene.addEventListener("measurement_added", onDistanceMeasurementAdded);
 
-      console.log("Event listeners added for volume events");
+      console.log("Event listeners added for volume, height, and distance events");
 
       viewer.setEDLEnabled(true);
       viewer.setFOV(60);
@@ -147,12 +165,18 @@
           <br /><br />
           <button id="update_button">Update</button>
           <br /><br />
-          <div>
-            <span>X: <span id="measurement_x">0</span></span><br>
-            <span>Y: <span id="measurement_y">0</span></span><br>
-            <span>Z: <span id="measurement_z">0</span></span><br>
-            <!-- Add other properties as needed -->
-          </div>
+          <h4>Height</h4>
+          <button id="update_height_button">Update Height</button>
+          <button id="keep_height_button">Keep Original Height</button>
+          <br /><br />
+          <h4>Crown Diameter</h4>
+          <button id="update_crown_button">Update Crown Diameter</button>
+          <button id="keep_crown_button">Keep Original Crown Diameter</button>
+          <br /><br />
+          <h4>Stem Diameter</h4>
+          <button id="update_stem_button">Update Stem Diameter</button>
+          <button id="keep_stem_button">Keep Original Stem Diameter</button>
+          <br /><br />
         </div>
       `);
         section.first().click(() => content.slideToggle());
@@ -273,7 +297,7 @@
           return navigator.userAgent;
         };
 
-        const calculatePolygonDiameter = () => {
+        const calculateCrownDiameter = () => {
           return (volumeMeasurementResult.x + volumeMeasurementResult.y) / 2;
         };
 
@@ -281,49 +305,89 @@
           // Placeholder function to calculate measurements
           // Implement actual calculations based on shapefile data
           const height = measurement.height; // Example height
-          const polygonDiameter = calculatePolygonDiameter(); // Calculate polygon diameter
+          const crownDiameter = calculateCrownDiameter(); // Calculate crown diameter
           const stemDiameter = 2; // Example stem diameter
 
           return {
             height,
-            polygonDiameter,
+            crownDiameter,
             stemDiameter,
           };
         };
 
-        const updateJsonFile = async (treeId) => {
-          const username = navigator.userAgent;
-          const measurements = await getTreeMeasurements(treeId);
-          const date = new Date().toISOString();
-        
-          const data = {
-            username,
-            date,
-            measurements,
-          };
-        
-          console.log('Sending data to server:', { treeId, data }); // Log data being sent
-        
+        const updateJsonFile = async (treeId, updatedMeasurements) => {
           try {
-            const response = await fetch('http://localhost:1234/update-json', {
+            const response = await fetch(`/outputs/${treeId}/${treeId}_measurements.json`);
+            const existingData = await response.json();
+            
+            const updatedData = {
+              ...existingData,
+              measurements: {
+                ...existingData.measurements,
+                ...updatedMeasurements
+              }
+            };
+
+            const res = await fetch('http://localhost:1234/update-json', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({ treeId, data }),
+              body: JSON.stringify({ treeId, data: updatedData }),
             });
         
-            const responseData = await response.json(); // Parse the response data
-            if (response.ok) {
+            const responseData = await res.json(); // Parse the response data
+            if (res.ok) {
               console.log('JSON file updated successfully:', responseData);
             } else {
               console.error('Failed to update JSON file:', responseData);
             }
           } catch (error) {
+            console.error('Error fetching or updating JSON file:', error);
+          }
+        };
+
+        const updateOriginalMeasurementsFile = async (treeId, originalMeasurements) => {
+          try {
+            const response = await fetch(`http://localhost:1234/save-original-measurements`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ treeId, originalMeasurements }),
+            });
+
+            if (response.ok) {
+              console.log('Original measurements saved successfully');
+            } else {
+              console.error('Failed to save original measurements');
+            }
+          } catch (error) {
             console.error('Error during fetch operation:', error);
           }
         };
+
+        const getOriginalMeasurements = async (treeId) => {
+          try {
+            const response = await fetch(`/outputs/${treeId}/${treeId}_original_measurements.json`);
+            const originalData = await response.json();
+            console.log("original data: ", originalData.measurements)
+            return originalData.measurements;
+          } catch (error) {
+            console.error('Error fetching original measurements:', error);
+            return null;
+          }
+        };
         
+        const restoreOriginalMeasurement = async (treeId, measurementType) => {
+          const originalMeasurements = await getOriginalMeasurements(treeId);
+          if (originalMeasurements && originalMeasurements[measurementType] !== undefined) {
+            const updatedMeasurements = {
+              [measurementType]: originalMeasurements[measurementType]
+            };
+            await updateJsonFile(treeId, updatedMeasurements);
+          }
+        };
 
         document
           .getElementById("submit_button")
@@ -381,7 +445,47 @@
 
           document.getElementById("update_button").addEventListener("click", () => {
             if (selectedTreeId) {
-              updateJsonFile(selectedTreeId);
+              updateJsonFile(selectedTreeId, {
+                height: heightMeasurementResult,
+                crownDiameter: calculateCrownDiameter(),
+                stemDiameter: distanceMeasurementResult
+              });
+            }
+          });
+
+          document.getElementById("update_height_button").addEventListener("click", () => {
+            if (selectedTreeId) {
+              updateJsonFile(selectedTreeId, { height: heightMeasurementResult });
+            }
+          });
+
+          document.getElementById("keep_height_button").addEventListener("click", () => {
+            if (selectedTreeId) {
+              restoreOriginalMeasurement(selectedTreeId, "height");
+            }
+          });
+
+          document.getElementById("update_crown_button").addEventListener("click", () => {
+            if (selectedTreeId) {
+              updateJsonFile(selectedTreeId, { crownDiameter: calculateCrownDiameter() });
+            }
+          });
+
+          document.getElementById("keep_crown_button").addEventListener("click", () => {
+            if (selectedTreeId) {
+              restoreOriginalMeasurement(selectedTreeId, "crownDiameter");
+            }
+          });
+
+          document.getElementById("update_stem_button").addEventListener("click", () => {
+            if (selectedTreeId) {
+              updateJsonFile(selectedTreeId, { stemDiameter: distanceMeasurementResult });
+            }
+          });
+
+          document.getElementById("keep_stem_button").addEventListener("click", () => {
+            if (selectedTreeId) {
+              restoreOriginalMeasurement(selectedTreeId, "stemDiameter");
             }
           });
 
