@@ -52,6 +52,9 @@
     let volumeMeasurementResult = {x: 0, y: 0, z: 0}; // Global variable to store volume measurement
     let heightMeasurementResult = 0; // Global variable to store height measurement
     let distanceMeasurementResult = 0; // Global variable to store distance measurement
+    let stemDiameterPolygons = []; // Array to store stem diameter polygons
+    let stemDiameterSliderValue = 0; // Selected value from the stem diameter slider
+    let originalStemDiameters = []; // Array to store original stem diameters
 
     window.viewer = new Potree.Viewer(
         document.getElementById("potree_render_area")
@@ -159,6 +162,10 @@
           <input type="range" id="z_shift_slider" value="0" />
           <span id="z_shift_value">0</span>
           <br /><br />
+          <label for="stem_diameter_slider">Stem Diameter:</label>
+          <input type="range" id="stem_diameter_slider" value="0" min="0" />
+          <span id="stem_diameter_value">0</span>
+          <br /><br />
           <button id="submit_button">Visualize</button>
           <br /><br />
           <button id="update_button">Update</button>
@@ -242,53 +249,79 @@
                 viewer.setClipTask(Potree.ClipTask.SHOW_INSIDE);
             }
         };
-
+        const createLineFromGeometry = (geometry, color, lineWidth = 1) => {
+          const material = new THREE.LineBasicMaterial({ color, linewidth: lineWidth, transparent: true, opacity: 0.25 });
+          const points = geometry.coordinates.map(coord => new THREE.Vector3(coord[0], coord[1], coord[2]));
+          const geometryLine = new THREE.BufferGeometry().setFromPoints(points);
+          return new THREE.Line(geometryLine, material);
+      };
+        
         const loadShapefile = async (path, color, zShift = 0) => {
             try {
                 const loader = new Potree.ShapefileLoader();
                 const shpPoints = await loader.load(path);
-
+        
+                let isStemDiameter = false;
+                if (path.includes("stem")) {
+                    isStemDiameter = true;
+                }
+        
                 if (shpPoints && shpPoints.node) {
                     shpPoints.node.position.set(0, 0, zShift);
                     shpPoints.node.updateMatrixWorld(true);
                     console.log("SHAPE type: ", shpPoints);
-
+        
                     shpPoints.node.traverse((node) => {
                         if (node.material) {
                             node.material.color.set(color);
+                            node.material.transparent = true;
+                            node.material.opacity = 0.8;
+                            node.material.linewidth = 0.5;
                         }
                     });
-
+        
                     shapeNode.add(shpPoints.node);
                     viewer.scene.scene.add(shapeNode); // Ensure shapeNode is added to the scene
+        
+                    if (isStemDiameter) {
+                        stemDiameterPolygons = shpPoints.features.map(feature => {
+                            return createLineFromGeometry(feature.geometry, 0xff00ff); // initial color magenta
+                        });
+                        // Remove the visualized shape nodes for stem diameter polygons immediately
+                        shpPoints.node.traverse((node) => {
+                            if (node.material) {
+                                shapeNode.remove(node);
+                            }
+                        });
+                        stemDiameterPolygons.forEach(line => shapeNode.add(line));
+                        updateStemDiameterSlider(stemDiameterPolygons.length);
+                    }
                 } else {
-                    console.error(
-                        "Loaded shapefile node is not a THREE.Object3D instance or is undefined:",
-                        shpPoints.node
-                    );
+                    console.error("Loaded shapefile node is not a THREE.Object3D instance or is undefined:", shpPoints.node);
                 }
             } catch (error) {
                 console.error(`Error loading shapefile (${path}):`, error);
             }
         };
-
+      
         const updateShapefiles = async (treeId) => {
             shapeNode.clear(); // Clear previous shapefiles
-
-            await loadShapefile(
-                `/outputs/${treeId}/${treeId}_height.shp`,
-                new THREE.Color(0.3, 0.3, 1)
-            );
-            await loadShapefile(
-                `/outputs/${treeId}/${treeId}_stem_diameters.shp`,
-                new THREE.Color(1, 0, 0)
-            );
+            stemDiameterPolygons.forEach(polygon => shapeNode.remove(polygon)); // Remove previous stem diameter polygons
+            stemDiameterPolygons = []; // Clear the array
+            viewer.scene.scene.remove(shapeNode); // Ensure shapeNode is removed from the scene
+            shapeNode = new THREE.Group(); // Create a new group for the new shapefiles
+            viewer.scene.scene.add(shapeNode); // Add the new group to the scene
+        
+            await loadShapefile(`/outputs/${treeId}/${treeId}_height.shp`, new THREE.Color(0.3, 0.3, 1));
+            await loadShapefile(`/outputs/${treeId}/${treeId}_stem_diameters.shp`, new THREE.Color(1, 0, 1), 0); // The logic will set isStemDiameter to true internally
             const zShift = parseFloat(document.getElementById("z_shift_slider").value);
-            await loadShapefile(
-                `/outputs/${treeId}/${treeId}_polygon.shp`,
-                new THREE.Color(0, 1, 0),
-                zShift
-            );
+            await loadShapefile(`/outputs/${treeId}/${treeId}_polygon.shp`, new THREE.Color(0, 1, 0), zShift);
+        
+            const originalMeasurements = await getOriginalMeasurements(treeId);
+            if (originalMeasurements && originalMeasurements.stemDiameter) {
+                originalStemDiameters = originalMeasurements.stemDiameter;
+                updateStemDiameterSlider(stemDiameterPolygons.length);
+            }
         };
 
         const getUsername = () => {
@@ -387,6 +420,33 @@
             }
         };
 
+        const updateStemDiameterSlider = (numPolygons) => {
+            const slider = document.getElementById("stem_diameter_slider");
+            slider.max = numPolygons - 1;
+            slider.value = stemDiameterSliderValue;
+            document.getElementById("stem_diameter_value").textContent = originalStemDiameters[stemDiameterSliderValue] || 0;
+            highlightStemDiameterPolygon(stemDiameterSliderValue);
+        };
+        
+        const highlightStemDiameterPolygon = (index) => {
+            const defaultWidth = 10;
+            const highlightedWidth = 10;
+            const defaultOpacity = 0.25;
+            const highlightedOpacity = 1;
+        
+            stemDiameterPolygons.forEach((polygon, idx) => {
+                if (polygon) {
+                    polygon.visible = (idx === index); // Only make the selected polygon visible
+                    polygon.material.color.set(idx === index ? 0xffff00 : 0xff00ff); // red for selected, magenta for others
+                    polygon.material.linewidth = idx === index ? highlightedWidth : defaultWidth; // set the line width
+                    polygon.material.transparent = true;
+                    polygon.material.opacity = idx === index ? highlightedOpacity : defaultOpacity; // set the opacity
+                    polygon.material.needsUpdate = true; // ensure the material update takes effect
+                }
+            });
+        };
+      
+
         document
             .getElementById("submit_button")
             .addEventListener("click", () => {
@@ -441,12 +501,18 @@
                 }
             });
 
+        document.getElementById("stem_diameter_slider").addEventListener("input", (event) => {
+            stemDiameterSliderValue = parseInt(event.target.value);
+            document.getElementById("stem_diameter_value").textContent = originalStemDiameters[stemDiameterSliderValue] || 0;
+            highlightStemDiameterPolygon(stemDiameterSliderValue);
+        });
+
         document.getElementById("update_button").addEventListener("click", () => {
             if (selectedTreeId) {
                 updateJsonFile(selectedTreeId, {
                     height: heightMeasurementResult,
                     crownDiameter: calculateCrownDiameter(),
-                    stemDiameter: distanceMeasurementResult
+                    stemDiameter: originalStemDiameters[stemDiameterSliderValue]
                 });
             }
         });
@@ -477,7 +543,7 @@
 
         document.getElementById("update_stem_button").addEventListener("click", () => {
             if (selectedTreeId) {
-                updateJsonFile(selectedTreeId, {stemDiameter: distanceMeasurementResult});
+                updateJsonFile(selectedTreeId, {stemDiameter: originalStemDiameters[stemDiameterSliderValue]});
             }
         });
 
