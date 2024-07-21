@@ -64,6 +64,7 @@
       let volume = null;
       let shapeNode = new THREE.Group();
       let offsetZ = 0;
+      let volumeMeasurementResult = { x: 0, y: 0, z: 0 }; // Global variable to store volume measurement
 
       window.viewer = new Potree.Viewer(
         document.getElementById("potree_render_area")
@@ -90,9 +91,21 @@
       function addVolumePropertyListeners(volume) {
         volume.addEventListener("position_changed", () => {
           console.log(volume.scale);
+          volumeMeasurementResult = {
+            x: volume.scale.x,
+            y: volume.scale.y,
+            z: volume.scale.z,
+          };
+          console.log('Volume Measurement Result:', volumeMeasurementResult);
         });
         volume.addEventListener("scale_changed", () => {
           console.log(volume.scale);
+          volumeMeasurementResult = {
+            x: volume.scale.x,
+            y: volume.scale.y,
+            z: volume.scale.z,
+          };
+          console.log('Volume Measurement Result:', volumeMeasurementResult);
         });
       }
 
@@ -260,12 +273,15 @@
           return navigator.userAgent;
         };
 
+        const calculatePolygonDiameter = () => {
+          return (volumeMeasurementResult.x + volumeMeasurementResult.y) / 2;
+        };
 
         const getTreeMeasurements = async (measurement) => {
           // Placeholder function to calculate measurements
           // Implement actual calculations based on shapefile data
           const height = measurement.height; // Example height
-          const polygonDiameter = (measurement.width + measurement.depth) / 2; // Example polygon diameter
+          const polygonDiameter = calculatePolygonDiameter(); // Calculate polygon diameter
           const stemDiameter = 2; // Example stem diameter
 
           return {
