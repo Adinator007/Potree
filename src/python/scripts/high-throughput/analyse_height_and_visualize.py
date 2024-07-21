@@ -6,6 +6,8 @@ import pandas as pd
 from scipy.spatial import KDTree
 import geopandas as gpd
 from shapely.geometry import LineString, Point
+import json
+from datetime import datetime
 
 # Load the point clouds
 canopy_path = "/mnt/d/ChimeraSolutions/Dendrocomplex/Dendro_Dayjob_tooling/high-throughput/Kalvaria-ter-drone_canopy.las"
@@ -104,6 +106,32 @@ for index, tree in tree_positions.iterrows():
     shapefile_path = os.path.join(tree_folder, f"{tree_label}_height.shp")
     gdf.to_file(shapefile_path)
     print(f"Height shapefile successfully created for tree {tree_label} at {shapefile_path}.")
+
+    # JSON file handling
+    json_filename = f"{tree_label}_original_measurements.json"
+    json_filepath = os.path.join(tree_folder, json_filename)
+
+    if not os.path.exists(json_filepath):
+        data = {
+            "username": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "date": datetime.now().isoformat(),
+            "measurements": {
+                "crownDiameter": 4,
+                "stemDiameter": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
+                "height": tree_height
+            }
+        }
+        with open(json_filepath, 'w') as json_file:
+            json.dump(data, json_file, indent=4)
+        print(f"JSON file successfully created for tree {tree_label} at {json_filepath}.")
+    else:
+        with open(json_filepath, 'r+') as json_file:
+            data = json.load(json_file)
+            data['measurements']['height'] = tree_height
+            json_file.seek(0)
+            json.dump(data, json_file, indent=4)
+            json_file.truncate()
+        print(f"JSON file successfully updated for tree {tree_label} at {json_filepath}.")
 
 # Output to CSV
 tree_heights_df = pd.DataFrame(tree_heights, columns=['label', 'tree_x', 'tree_y', 'tree_z', 'grid_x', 'grid_y', 'grid_z', 'height'])

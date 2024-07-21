@@ -1,8 +1,9 @@
 {
   "username": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  "date": "2024-07-20T21:06:08.270Z",
+  "date": "2024-07-21T12:06:51.322Z",
   "measurements": {
-    "polygonDiameter": null,
-    "stemDiameter": 2
+    "crownDiameter": 5.660783937241649,
+    "height": 12.423000008344388,
+    "stemDiameter": 0.5170968310643295
   }
 }

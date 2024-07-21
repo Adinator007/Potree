@@ -6,6 +6,8 @@ from shapely.geometry import Point, Polygon
 from shapely.ops import nearest_points
 import fiona
 from fiona.crs import from_epsg
+import json
+from datetime import datetime
 
 # Load the coordinates
 tree_positions_path = "/mnt/d/ChimeraSolutions/Dendrocomplex/Dendro_Dayjob_tooling/high-throughput/torzs_koordinatak_plusz.txt"
@@ -47,6 +49,9 @@ for index, tree in tree_positions.iterrows():
 
     polygon_z = Polygon(polygon_coords)
 
+    # Calculate crown diameter
+    crown_diameter = polygon_z.length/np.pi
+
     # Create tree folder
     tree_folder = os.path.join(output_folder, tree_label)
     if not os.path.exists(tree_folder):
@@ -67,5 +72,31 @@ for index, tree in tree_positions.iterrows():
             'properties': {'label': tree_label}
         })
     print(f"Polygon shapefile successfully created for tree {tree_label} at {shapefile_path}.")
+
+    # JSON file handling
+    json_filename = f"{tree_label}_original_measurements.json"
+    json_filepath = os.path.join(tree_folder, json_filename)
+
+    if not os.path.exists(json_filepath):
+        data = {
+            "username": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "date": datetime.now().isoformat(),
+            "measurements": {
+                "crownDiameter": crown_diameter,
+                "stemDiameter": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
+                "height": 10  # Placeholder value, assuming height is not measured in this script
+            }
+        }
+        with open(json_filepath, 'w') as json_file:
+            json.dump(data, json_file, indent=4)
+        print(f"JSON file successfully created for tree {tree_label} at {json_filepath}.")
+    else:
+        with open(json_filepath, 'r+') as json_file:
+            data = json.load(json_file)
+            data['measurements']['crownDiameter'] = crown_diameter
+            json_file.seek(0)
+            json.dump(data, json_file, indent=4)
+            json_file.truncate()
+        print(f"JSON file successfully updated for tree {tree_label} at {json_filepath}.")
 
 print("All polygon shapefiles successfully created.")

@@ -9,6 +9,8 @@ import geopandas as gpd
 from shapely.geometry import LineString, mapping
 import fiona
 from fiona.crs import from_epsg
+import json
+from datetime import datetime
 
 # Adatok betöltése
 stems_path = "/mnt/d/ChimeraSolutions/Dendrocomplex/Dendro_Dayjob_tooling/high-throughput/Kalvaria-ter-drone_stems.las"
@@ -44,6 +46,8 @@ for index, tree in tree_positions.iterrows():
     tree_label = str(int(tree['label']))
 
     hull_lines = []
+    stem_diameters_with_heights = []
+    measured_heights = []
 
     for i in range(-4, 3):  # 4 below, 2 above
         height = 1.0 + i * measurement_interval
@@ -77,6 +81,11 @@ for index, tree in tree_positions.iterrows():
 
         hull = ConvexHull(inlier_points[:, :2])
         hull_points = inlier_points[hull.vertices]
+
+        # Calculate diameter and add to the list
+        diameter = hull.area / np.pi
+        stem_diameters_with_heights.append(diameter)
+        measured_heights.append(height)
 
         # LineString létrehozása a konvex burokhoz (LineStringZ)
         hull_line = LineString([(p[0], p[1], p[2]) for p in hull_points])
@@ -123,4 +132,32 @@ for index, tree in tree_positions.iterrows():
     else:
         print(f"No valid lines found for tree {tree_label}.")
 
+    # JSON file handling
+    json_filename = f"{tree_label}_original_measurements.json"
+    json_filepath = os.path.join(tree_folder, json_filename)
 
+    if not os.path.exists(json_filepath):
+        data = {
+            "username": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "date": datetime.now().isoformat(),
+            "measurements": {
+                "crownDiameter": 4,  # Placeholder value
+                "stemDiameter": stem_diameters_with_heights,
+                "measuredHeight": measured_heights,
+                "height": 10  # Placeholder value
+            }
+        }
+        with open(json_filepath, 'w') as json_file:
+            json.dump(data, json_file, indent=4)
+        print(f"JSON file successfully created for tree {tree_label} at {json_filepath}.")
+    else:
+        with open(json_filepath, 'r+') as json_file:
+            data = json.load(json_file)
+            data['measurements']['stemDiameter'] = stem_diameters_with_heights
+            data['measurements']['measuredHeight'] = measured_heights
+            json_file.seek(0)
+            json.dump(data, json_file, indent=4)
+            json_file.truncate()
+        print(f"JSON file successfully updated for tree {tree_label} at {json_filepath}.")
+
+print("All polygon shapefiles successfully created.")
