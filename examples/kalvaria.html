@@ -1,145 +1,143 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="description" content="" />
-    <meta name="author" content="" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, user-scalable=no"
-    />
+<head>
+    <meta charset="utf-8"/>
+    <meta name="description" content=""/>
+    <meta name="author" content=""/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
     <title>Potree Viewer</title>
 
-    <link rel="stylesheet" type="text/css" href="../build/potree/potree.css" />
-    <link
-      rel="stylesheet"
-      type="text/css"
-      href="../libs/jquery-ui/jquery-ui.min.css"
-    />
-    <link rel="stylesheet" type="text/css" href="../libs/openlayers3/ol.css" />
-    <link
-      rel="stylesheet"
-      type="text/css"
-      href="../libs/spectrum/spectrum.css"
-    />
-    <link
-      rel="stylesheet"
-      type="text/css"
-      href="../libs/jstree/themes/mixed/style.css"
-    />
-  </head>
+    <link rel="stylesheet" type="text/css" href="../build/potree/potree.css"/>
+    <link rel="stylesheet" type="text/css" href="../libs/jquery-ui/jquery-ui.min.css"/>
+    <link rel="stylesheet" type="text/css" href="../libs/openlayers3/ol.css"/>
+    <link rel="stylesheet" type="text/css" href="../libs/spectrum/spectrum.css"/>
+    <link rel="stylesheet" type="text/css" href="../libs/jstree/themes/mixed/style.css"/>
+</head>
 
-  <body>
-    <script src="../libs/jquery/jquery-3.1.1.min.js"></script>
-    <script src="../libs/spectrum/spectrum.js"></script>
-    <script src="../libs/jquery-ui/jquery-ui.min.js"></script>
-    <script src="../libs/other/BinaryHeap.js"></script>
-    <script src="../libs/tween/tween.min.js"></script>
-    <script src="../libs/d3/d3.js"></script>
-    <script src="../libs/proj4/proj4.js"></script>
-    <script src="../libs/openlayers3/ol.js"></script>
-    <script src="../libs/i18next/i18next.js"></script>
-    <script src="../libs/jstree/jstree.js"></script>
-    <script src="../build/potree/potree.js"></script>
-    <script src="../libs/plasio/js/laslaz.js"></script>
-    <script src="../libs/shapefile/shapefile.js"></script>
+<body>
+<script src="../libs/jquery/jquery-3.1.1.min.js"></script>
+<script src="../libs/spectrum/spectrum.js"></script>
+<script src="../libs/jquery-ui/jquery-ui.min.js"></script>
+<script src="../libs/other/BinaryHeap.js"></script>
+<script src="../libs/tween/tween.min.js"></script>
+<script src="../libs/d3/d3.js"></script>
+<script src="../libs/proj4/proj4.js"></script>
+<script src="../libs/openlayers3/ol.js"></script>
+<script src="../libs/i18next/i18next.js"></script>
+<script src="../libs/jstree/jstree.js"></script>
+<script src="../build/potree/potree.js"></script>
+<script src="../libs/plasio/js/laslaz.js"></script>
+<script src="../libs/shapefile/shapefile.js"></script>
 
+<div
+        class="potree_container"
+        style="position: absolute; width: 100%; height: 100%; left: 0px; top: 0px"
+>
     <div
-      class="potree_container"
-      style="position: absolute; width: 100%; height: 100%; left: 0px; top: 0px"
-    >
-      <div
-        id="potree_render_area"
-        style="
+            id="potree_render_area"
+            style="
           background-image: url('../build/potree/resources/images/background.jpg');
         "
-      ></div>
-      <div id="potree_sidebar_container"></div>
-    </div>
+    ></div>
+    <div id="potree_sidebar_container"></div>
+</div>
 
-    <script type="module">
-      import * as THREE from "../libs/three.js/build/three.module.js";
+<script type="module">
+    import * as THREE from "../libs/three.js/build/three.module.js";
 
-      let selectedTreeId = null;
-      let volume = null;
-      let shapeNode = new THREE.Group();
-      let offsetZ = 0;
-      let volumeMeasurementResult = { x: 0, y: 0, z: 0 }; // Global variable to store volume measurement
-      let heightMeasurementResult = 0; // Global variable to store height measurement
-      let distanceMeasurementResult = 0; // Global variable to store distance measurement
+    let selectedTreeId = null;
+    let volume = null;
+    let shapeNode = new THREE.Group();
+    let offsetZ = 0;
+    let volumeMeasurementResult = {x: 0, y: 0, z: 0}; // Global variable to store volume measurement
+    let heightMeasurementResult = 0; // Global variable to store height measurement
+    let distanceMeasurementResult = 0; // Global variable to store distance measurement
 
-      window.viewer = new Potree.Viewer(
+    window.viewer = new Potree.Viewer(
         document.getElementById("potree_render_area")
-      );
+    );
 
-      // Function to log measurements
-      function logMeasurements() {
+    // Function to log measurements
+    function logMeasurements() {
         const measurements = viewer.scene.measurements;
-        
+
         console.log("Measurements in the scene:");
         measurements.forEach(measurement => {
-          console.log(measurement);
+            console.log(measurement);
         });
-      }
+    }
 
-      // Function to handle volume added
-      function onVolumeAdded(event) {
+    // Function to handle volume added
+    function onVolumeAdded(event) {
         console.log("Volume added:", event.volume);
         logMeasurements();
         addVolumePropertyListeners(event.volume);
-      }
+    }
 
-      // Function to handle height measurement added
-      function onHeightMeasurementAdded(event) {
-        console.log("Height measurement added:", event.measurement);
-        heightMeasurementResult = event.measurement.length;
-        console.log('Height Measurement Result:', heightMeasurementResult);
-      }
+    // Function to handle height measurement added
+    function onHeightMeasurementAdded(event) {
+        if (event.measurement.name === "Height") {
+            console.log("EVENT MEASUREMENT NAME: ", event.measurement.name)
+            event.measurement.addEventListener("marker_moved", () => {
+                heightMeasurementResult = Math.abs(event.measurement.points[0].position.z - event.measurement.points[1].position.z)
+            });
+            console.log("Height measurement added:", event.measurement);
+            console.log('Height Measurement Result:', heightMeasurementResult);
+        }
+    }
 
-      // Function to handle distance measurement added
-      function onDistanceMeasurementAdded(event) {
+    // Function to handle distance measurement added
+    function onDistanceMeasurementAdded(event) {
+      if (event.measurement.name === "Distance") {
+        console.log("EVENT MEASUREMENT NAME: ", event.measurement.name)
+        event.measurement.addEventListener("marker_moved", () => {
+            distanceMeasurementResult = Math.abs(event.measurement.points[0].position.z - event.measurement.points[1].position.z)
+    
+
+        });
         console.log("Distance measurement added:", event.measurement);
-        distanceMeasurementResult = event.measurement.length;
         console.log('Distance Measurement Result:', distanceMeasurementResult);
+        
       }
+    }
 
-      // Add listeners for volume properties
-      function addVolumePropertyListeners(volume) {
+    // Add listeners for volume properties
+    function addVolumePropertyListeners(volume) {
         volume.addEventListener("position_changed", () => {
-          console.log(volume.scale);
-          volumeMeasurementResult = {
-            x: volume.scale.x,
-            y: volume.scale.y,
-            z: volume.scale.z,
-          };
-          console.log('Volume Measurement Result:', volumeMeasurementResult);
+            console.log(volume.scale);
+            volumeMeasurementResult = {
+                x: volume.scale.x,
+                y: volume.scale.y,
+                z: volume.scale.z,
+            };
+            console.log('Volume Measurement Result:', volumeMeasurementResult);
         });
         volume.addEventListener("scale_changed", () => {
-          console.log(volume.scale);
-          volumeMeasurementResult = {
-            x: volume.scale.x,
-            y: volume.scale.y,
-            z: volume.scale.z,
-          };
-          console.log('Volume Measurement Result:', volumeMeasurementResult);
+            console.log(volume.scale);
+            volumeMeasurementResult = {
+                x: volume.scale.x,
+                y: volume.scale.y,
+                z: volume.scale.z,
+            };
+            console.log('Volume Measurement Result:', volumeMeasurementResult);
         });
-      }
+    }
 
-      // Add event listeners to the viewer's scene
-      viewer.scene.addEventListener("volume_added", onVolumeAdded);
-      viewer.scene.addEventListener("measurement_added", onHeightMeasurementAdded);
-      viewer.scene.addEventListener("measurement_added", onDistanceMeasurementAdded);
+    // Add event listeners to the viewer's scene
+    viewer.scene.addEventListener("volume_added", onVolumeAdded);
+    viewer.scene.addEventListener("measurement_added", onHeightMeasurementAdded);
+    viewer.scene.addEventListener("measurement_added", onDistanceMeasurementAdded);
 
-      console.log("Event listeners added for volume, height, and distance events");
+    console.log("Event listeners added for volume, height, and distance events");
 
-      viewer.setEDLEnabled(true);
-      viewer.setFOV(60);
-      viewer.setPointBudget(1_000_000);
-      viewer.setMinNodeSize(0);
-      viewer.loadSettingsFromURL();
-      viewer.setDescription("");
+    viewer.setEDLEnabled(true);
+    viewer.setFOV(60);
+    viewer.setPointBudget(1_000_000);
+    viewer.setMinNodeSize(0);
+    viewer.loadSettingsFromURL();
+    viewer.setDescription("");
 
-      viewer.loadGUI(() => {
+    viewer.loadGUI(() => {
         viewer.setLanguage("en");
         viewer.toggleSidebar();
 
@@ -185,426 +183,426 @@
         const treeData = [];
 
         const parseTreeData = async (url) => {
-          const response = await fetch(url);
-          const text = await response.text();
-          const lines = text.split("\n");
+            const response = await fetch(url);
+            const text = await response.text();
+            const lines = text.split("\n");
 
-          for (const line of lines) {
-            const parts = line.split(",");
-            if (parts.length === 4) {
-              treeData.push({
-                id: parts[0],
-                x: parseFloat(parts[1]),
-                y: parseFloat(parts[2]),
-                z: parseFloat(parts[3]),
-              });
+            for (const line of lines) {
+                const parts = line.split(",");
+                if (parts.length === 4) {
+                    treeData.push({
+                        id: parts[0],
+                        x: parseFloat(parts[1]),
+                        y: parseFloat(parts[2]),
+                        z: parseFloat(parts[3]),
+                    });
+                }
             }
-          }
 
-          populateTreeSelector(treeData);
+            populateTreeSelector(treeData);
         };
 
         const populateTreeSelector = (data) => {
-          const treeIdSelect = document.getElementById("tree_id");
-          data.forEach((tree) => {
-            const option = document.createElement("option");
-            option.value = tree.id;
-            option.text = tree.id;
-            treeIdSelect.add(option);
-          });
+            const treeIdSelect = document.getElementById("tree_id");
+            data.forEach((tree) => {
+                const option = document.createElement("option");
+                option.value = tree.id;
+                option.text = tree.id;
+                treeIdSelect.add(option);
+            });
 
-          treeIdSelect.addEventListener("change", () => {
-            selectedTreeId = treeIdSelect.value;
-            console.log(`Selected Tree ID: ${selectedTreeId}`);
+            treeIdSelect.addEventListener("change", () => {
+                selectedTreeId = treeIdSelect.value;
+                console.log(`Selected Tree ID: ${selectedTreeId}`);
 
-            const selectedTree = treeData.find(
-              (tree) => tree.id === selectedTreeId
-            );
-            if (selectedTree) {
-              const { x, y, z } = selectedTree;
-              console.log(
-                `Coordinates for selected tree ID (${selectedTreeId}):`,
-                { x, y, z }
-              );
-              const radius = parseFloat(document.getElementById("radius_slider").value);
-              updateVolumePosition(new THREE.Vector3(x, y, z), radius);
+                const selectedTree = treeData.find(
+                    (tree) => tree.id === selectedTreeId
+                );
+                if (selectedTree) {
+                    const {x, y, z} = selectedTree;
+                    console.log(
+                        `Coordinates for selected tree ID (${selectedTreeId}):`,
+                        {x, y, z}
+                    );
+                    const radius = parseFloat(document.getElementById("radius_slider").value);
+                    updateVolumePosition(new THREE.Vector3(x, y, z), radius);
 
-              // Update shapefiles based on the selected tree ID
-              updateShapefiles(selectedTreeId);
-            }
-          });
+                    // Update shapefiles based on the selected tree ID
+                    updateShapefiles(selectedTreeId);
+                }
+            });
         };
 
         const updateVolumePosition = (center, radius) => {
-          console.log(`Updating volume position with center: ${center}, radius: ${radius}`);
+            console.log(`Updating volume position with center: ${center}, radius: ${radius}`);
 
-          if (volume) {
-            volume.position.set(center.x, center.y, center.z);
-            volume.scale.set(radius * 2, radius * 2, radius * 50);
-            viewer.setClipTask(Potree.ClipTask.SHOW_INSIDE);
-          }
+            if (volume) {
+                volume.position.set(center.x, center.y, center.z);
+                volume.scale.set(radius * 2, radius * 2, radius * 50);
+                viewer.setClipTask(Potree.ClipTask.SHOW_INSIDE);
+            }
         };
 
         const loadShapefile = async (path, color, zShift = 0) => {
-          try {
-            const loader = new Potree.ShapefileLoader();
-            const shpPoints = await loader.load(path);
+            try {
+                const loader = new Potree.ShapefileLoader();
+                const shpPoints = await loader.load(path);
 
-            if (shpPoints && shpPoints.node) {
-              shpPoints.node.position.set(0, 0, zShift);
-              shpPoints.node.updateMatrixWorld(true);
-              console.log("SHAPE type: ", shpPoints);
+                if (shpPoints && shpPoints.node) {
+                    shpPoints.node.position.set(0, 0, zShift);
+                    shpPoints.node.updateMatrixWorld(true);
+                    console.log("SHAPE type: ", shpPoints);
 
-              shpPoints.node.traverse((node) => {
-                if (node.material) {
-                  node.material.color.set(color);
+                    shpPoints.node.traverse((node) => {
+                        if (node.material) {
+                            node.material.color.set(color);
+                        }
+                    });
+
+                    shapeNode.add(shpPoints.node);
+                    viewer.scene.scene.add(shapeNode); // Ensure shapeNode is added to the scene
+                } else {
+                    console.error(
+                        "Loaded shapefile node is not a THREE.Object3D instance or is undefined:",
+                        shpPoints.node
+                    );
                 }
-              });
-
-              shapeNode.add(shpPoints.node);
-              viewer.scene.scene.add(shapeNode); // Ensure shapeNode is added to the scene
-            } else {
-              console.error(
-                "Loaded shapefile node is not a THREE.Object3D instance or is undefined:",
-                shpPoints.node
-              );
+            } catch (error) {
+                console.error(`Error loading shapefile (${path}):`, error);
             }
-          } catch (error) {
-            console.error(`Error loading shapefile (${path}):`, error);
-          }
         };
 
         const updateShapefiles = async (treeId) => {
-          shapeNode.clear(); // Clear previous shapefiles
+            shapeNode.clear(); // Clear previous shapefiles
 
-          await loadShapefile(
-            `/outputs/${treeId}/${treeId}_height.shp`,
-            new THREE.Color(0.3, 0.3, 1)
-          );
-          await loadShapefile(
-            `/outputs/${treeId}/${treeId}_stem_diameters.shp`,
-            new THREE.Color(1, 0, 0)
-          );
-          const zShift = parseFloat(document.getElementById("z_shift_slider").value);
-          await loadShapefile(
-            `/outputs/${treeId}/${treeId}_polygon.shp`,
-            new THREE.Color(0, 1, 0),
-            zShift
-          );
+            await loadShapefile(
+                `/outputs/${treeId}/${treeId}_height.shp`,
+                new THREE.Color(0.3, 0.3, 1)
+            );
+            await loadShapefile(
+                `/outputs/${treeId}/${treeId}_stem_diameters.shp`,
+                new THREE.Color(1, 0, 0)
+            );
+            const zShift = parseFloat(document.getElementById("z_shift_slider").value);
+            await loadShapefile(
+                `/outputs/${treeId}/${treeId}_polygon.shp`,
+                new THREE.Color(0, 1, 0),
+                zShift
+            );
         };
 
         const getUsername = () => {
-          return navigator.userAgent;
+            return navigator.userAgent;
         };
 
         const calculateCrownDiameter = () => {
-          return (volumeMeasurementResult.x + volumeMeasurementResult.y) / 2;
+            return (volumeMeasurementResult.x + volumeMeasurementResult.y) / 2;
         };
 
         const getTreeMeasurements = async (measurement) => {
-          // Placeholder function to calculate measurements
-          // Implement actual calculations based on shapefile data
-          const height = measurement.height; // Example height
-          const crownDiameter = calculateCrownDiameter(); // Calculate crown diameter
-          const stemDiameter = 2; // Example stem diameter
+            // Placeholder function to calculate measurements
+            // Implement actual calculations based on shapefile data
+            const height = measurement.height; // Example height
+            const crownDiameter = calculateCrownDiameter(); // Calculate crown diameter
+            const stemDiameter = 2; // Example stem diameter
 
-          return {
-            height,
-            crownDiameter,
-            stemDiameter,
-          };
+            return {
+                height,
+                crownDiameter,
+                stemDiameter,
+            };
         };
 
         const updateJsonFile = async (treeId, updatedMeasurements) => {
-          try {
-            const response = await fetch(`/outputs/${treeId}/${treeId}_measurements.json`);
-            const existingData = await response.json();
-            
-            const updatedData = {
-              ...existingData,
-              measurements: {
-                ...existingData.measurements,
-                ...updatedMeasurements
-              }
-            };
+            try {
+                const response = await fetch(`/outputs/${treeId}/${treeId}_measurements.json`);
+                const existingData = await response.json();
 
-            const res = await fetch('http://localhost:1234/update-json', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ treeId, data: updatedData }),
-            });
-        
-            const responseData = await res.json(); // Parse the response data
-            if (res.ok) {
-              console.log('JSON file updated successfully:', responseData);
-            } else {
-              console.error('Failed to update JSON file:', responseData);
+                const updatedData = {
+                    ...existingData,
+                    measurements: {
+                        ...existingData.measurements,
+                        ...updatedMeasurements
+                    }
+                };
+
+                const res = await fetch('http://localhost:1234/update-json', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({treeId, data: updatedData}),
+                });
+
+                const responseData = await res.json(); // Parse the response data
+                if (res.ok) {
+                    console.log('JSON file updated successfully:', responseData);
+                } else {
+                    console.error('Failed to update JSON file:', responseData);
+                }
+            } catch (error) {
+                console.error('Error fetching or updating JSON file:', error);
             }
-          } catch (error) {
-            console.error('Error fetching or updating JSON file:', error);
-          }
         };
 
         const updateOriginalMeasurementsFile = async (treeId, originalMeasurements) => {
-          try {
-            const response = await fetch(`http://localhost:1234/save-original-measurements`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ treeId, originalMeasurements }),
-            });
+            try {
+                const response = await fetch(`http://localhost:1234/save-original-measurements`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({treeId, originalMeasurements}),
+                });
 
-            if (response.ok) {
-              console.log('Original measurements saved successfully');
-            } else {
-              console.error('Failed to save original measurements');
+                if (response.ok) {
+                    console.log('Original measurements saved successfully');
+                } else {
+                    console.error('Failed to save original measurements');
+                }
+            } catch (error) {
+                console.error('Error during fetch operation:', error);
             }
-          } catch (error) {
-            console.error('Error during fetch operation:', error);
-          }
         };
 
         const getOriginalMeasurements = async (treeId) => {
-          try {
-            const response = await fetch(`/outputs/${treeId}/${treeId}_original_measurements.json`);
-            const originalData = await response.json();
-            console.log("original data: ", originalData.measurements)
-            return originalData.measurements;
-          } catch (error) {
-            console.error('Error fetching original measurements:', error);
-            return null;
-          }
+            try {
+                const response = await fetch(`/outputs/${treeId}/${treeId}_original_measurements.json`);
+                const originalData = await response.json();
+                console.log("original data: ", originalData.measurements)
+                return originalData.measurements;
+            } catch (error) {
+                console.error('Error fetching original measurements:', error);
+                return null;
+            }
         };
-        
+
         const restoreOriginalMeasurement = async (treeId, measurementType) => {
-          const originalMeasurements = await getOriginalMeasurements(treeId);
-          if (originalMeasurements && originalMeasurements[measurementType] !== undefined) {
-            const updatedMeasurements = {
-              [measurementType]: originalMeasurements[measurementType]
-            };
-            await updateJsonFile(treeId, updatedMeasurements);
-          }
+            const originalMeasurements = await getOriginalMeasurements(treeId);
+            if (originalMeasurements && originalMeasurements[measurementType] !== undefined) {
+                const updatedMeasurements = {
+                    [measurementType]: originalMeasurements[measurementType]
+                };
+                await updateJsonFile(treeId, updatedMeasurements);
+            }
         };
 
         document
-          .getElementById("submit_button")
-          .addEventListener("click", () => {
-            const selectedId = document.getElementById("tree_id").value;
-            const radius = parseFloat(
-              document.getElementById("radius_slider").value
-            );
-            const selectedTree = treeData.find(
-              (tree) => tree.id === selectedId
-            );
-
-            if (selectedTree) {
-              const center = new THREE.Vector3(
-                selectedTree.x,
-                selectedTree.y,
-                selectedTree.z
-              );
-              updateVolumePosition(center, radius);
-            }
-          });
-
-        document
-          .getElementById("radius_slider")
-          .addEventListener("input", (event) => {
-            document.getElementById(
-              "radius_value"
-            ).textContent = `${event.target.value}m`;
-
-            if (selectedTreeId) {
-              const selectedTree = treeData.find(
-                (tree) => tree.id === selectedTreeId
-              );
-              if (selectedTree) {
-                const center = new THREE.Vector3(
-                  selectedTree.x,
-                  selectedTree.y,
-                  selectedTree.z
+            .getElementById("submit_button")
+            .addEventListener("click", () => {
+                const selectedId = document.getElementById("tree_id").value;
+                const radius = parseFloat(
+                    document.getElementById("radius_slider").value
                 );
-                const radius = parseFloat(event.target.value);
-                updateVolumePosition(center, radius);
-              }
-            }
-          });
+                const selectedTree = treeData.find(
+                    (tree) => tree.id === selectedId
+                );
+
+                if (selectedTree) {
+                    const center = new THREE.Vector3(
+                        selectedTree.x,
+                        selectedTree.y,
+                        selectedTree.z
+                    );
+                    updateVolumePosition(center, radius);
+                }
+            });
 
         document
-          .getElementById("z_shift_slider")
-          .addEventListener("input", (event) => {
-            document.getElementById("z_shift_value").textContent = `${event.target.value}`;
+            .getElementById("radius_slider")
+            .addEventListener("input", (event) => {
+                document.getElementById(
+                    "radius_value"
+                ).textContent = `${event.target.value}m`;
 
-            if (selectedTreeId) {
-              updateShapefiles(selectedTreeId);
-            }
-          });
+                if (selectedTreeId) {
+                    const selectedTree = treeData.find(
+                        (tree) => tree.id === selectedTreeId
+                    );
+                    if (selectedTree) {
+                        const center = new THREE.Vector3(
+                            selectedTree.x,
+                            selectedTree.y,
+                            selectedTree.z
+                        );
+                        const radius = parseFloat(event.target.value);
+                        updateVolumePosition(center, radius);
+                    }
+                }
+            });
 
-          document.getElementById("update_button").addEventListener("click", () => {
-            if (selectedTreeId) {
-              updateJsonFile(selectedTreeId, {
-                height: heightMeasurementResult,
-                crownDiameter: calculateCrownDiameter(),
-                stemDiameter: distanceMeasurementResult
-              });
-            }
-          });
+        document
+            .getElementById("z_shift_slider")
+            .addEventListener("input", (event) => {
+                document.getElementById("z_shift_value").textContent = `${event.target.value}`;
 
-          document.getElementById("update_height_button").addEventListener("click", () => {
-            if (selectedTreeId) {
-              updateJsonFile(selectedTreeId, { height: heightMeasurementResult });
-            }
-          });
+                if (selectedTreeId) {
+                    updateShapefiles(selectedTreeId);
+                }
+            });
 
-          document.getElementById("keep_height_button").addEventListener("click", () => {
+        document.getElementById("update_button").addEventListener("click", () => {
             if (selectedTreeId) {
-              restoreOriginalMeasurement(selectedTreeId, "height");
+                updateJsonFile(selectedTreeId, {
+                    height: heightMeasurementResult,
+                    crownDiameter: calculateCrownDiameter(),
+                    stemDiameter: distanceMeasurementResult
+                });
             }
-          });
+        });
 
-          document.getElementById("update_crown_button").addEventListener("click", () => {
+        document.getElementById("update_height_button").addEventListener("click", () => {
             if (selectedTreeId) {
-              updateJsonFile(selectedTreeId, { crownDiameter: calculateCrownDiameter() });
+                updateJsonFile(selectedTreeId, {height: heightMeasurementResult});
             }
-          });
+        });
 
-          document.getElementById("keep_crown_button").addEventListener("click", () => {
+        document.getElementById("keep_height_button").addEventListener("click", () => {
             if (selectedTreeId) {
-              restoreOriginalMeasurement(selectedTreeId, "crownDiameter");
+                restoreOriginalMeasurement(selectedTreeId, "height");
             }
-          });
+        });
 
-          document.getElementById("update_stem_button").addEventListener("click", () => {
+        document.getElementById("update_crown_button").addEventListener("click", () => {
             if (selectedTreeId) {
-              updateJsonFile(selectedTreeId, { stemDiameter: distanceMeasurementResult });
+                updateJsonFile(selectedTreeId, {crownDiameter: calculateCrownDiameter()});
             }
-          });
+        });
 
-          document.getElementById("keep_stem_button").addEventListener("click", () => {
+        document.getElementById("keep_crown_button").addEventListener("click", () => {
             if (selectedTreeId) {
-              restoreOriginalMeasurement(selectedTreeId, "stemDiameter");
+                restoreOriginalMeasurement(selectedTreeId, "crownDiameter");
             }
-          });
+        });
+
+        document.getElementById("update_stem_button").addEventListener("click", () => {
+            if (selectedTreeId) {
+                updateJsonFile(selectedTreeId, {stemDiameter: distanceMeasurementResult});
+            }
+        });
+
+        document.getElementById("keep_stem_button").addEventListener("click", () => {
+            if (selectedTreeId) {
+                restoreOriginalMeasurement(selectedTreeId, "stemDiameter");
+            }
+        });
 
         parseTreeData("/examples/kalvaria_pcd/torzs_koordinatak_plusz.txt");
 
         // Load your point cloud
         const loadPointCloud = async (url, name) => {
-          try {
-            const response = await fetch(url);
-            const metadata = await response.json();
-            const offset = metadata.offset;
+            try {
+                const response = await fetch(url);
+                const metadata = await response.json();
+                const offset = metadata.offset;
 
-            // Set the z_shift_slider range dynamically based on offset[2]
-            const zShiftSlider = document.getElementById("z_shift_slider");
-            offsetZ = offset[2];
-            zShiftSlider.min = offsetZ - 50;
-            zShiftSlider.max = offsetZ + 100;
-            zShiftSlider.value = offsetZ;
-            document.getElementById("z_shift_value").textContent = zShiftSlider.value;
+                // Set the z_shift_slider range dynamically based on offset[2]
+                const zShiftSlider = document.getElementById("z_shift_slider");
+                offsetZ = offset[2];
+                zShiftSlider.min = offsetZ - 50;
+                zShiftSlider.max = offsetZ + 100;
+                zShiftSlider.value = offsetZ;
+                document.getElementById("z_shift_value").textContent = zShiftSlider.value;
 
-            Potree.loadPointCloud(url, name, async function (e) {
-              if (!e.pointcloud) {
-                console.error("Failed to load point cloud");
-                return;
-              }
+                Potree.loadPointCloud(url, name, async function (e) {
+                    if (!e.pointcloud) {
+                        console.error("Failed to load point cloud");
+                        return;
+                    }
 
-              console.log("Point cloud loaded successfully", e.pointcloud);
+                    console.log("Point cloud loaded successfully", e.pointcloud);
 
-              let pointcloud = e.pointcloud;
-              let center = pointcloud.position;
+                    let pointcloud = e.pointcloud;
+                    let center = pointcloud.position;
 
-              console.log("Point cloud position:", pointcloud.position);
-              console.log("Point cloud boundingBox:", pointcloud.boundingBox);
+                    console.log("Point cloud position:", pointcloud.position);
+                    console.log("Point cloud boundingBox:", pointcloud.boundingBox);
 
-              let pointMaterial = pointcloud.material;
-              pointMaterial.size = 1;
-              pointMaterial.pointSizeType = Potree.PointSizeType.ADAPTIVE;
-              pointMaterial.uniforms.uShadowColor.value = [0.0, 0, 0];
+                    let pointMaterial = pointcloud.material;
+                    pointMaterial.size = 1;
+                    pointMaterial.pointSizeType = Potree.PointSizeType.ADAPTIVE;
+                    pointMaterial.uniforms.uShadowColor.value = [0.0, 0, 0];
 
-              console.log("Point cloud center position:", center);
+                    console.log("Point cloud center position:", center);
 
-              viewer.scene.view.position.set(center.x, center.y, center.z + 100);
-              viewer.scene.view.lookAt(center);
+                    viewer.scene.view.position.set(center.x, center.y, center.z + 100);
+                    viewer.scene.view.lookAt(center);
 
-              viewer.scene.addPointCloud(pointcloud);
+                    viewer.scene.addPointCloud(pointcloud);
 
-              if (pointcloud.nodes) {
-                pointcloud.nodes.traverse((node) => {
-                  node.visible = true;
+                    if (pointcloud.nodes) {
+                        pointcloud.nodes.traverse((node) => {
+                            node.visible = true;
+                        });
+                    }
+
+                    const addVolume = (name, scale, position, visible) => {
+                        volume = new Potree.BoxVolume();
+                        volume.name = name;
+                        volume.scale.set(scale.x, scale.y, scale.z);
+                        volume.position.set(position.x, position.y, position.z);
+                        volume.clip = true;
+                        volume.visible = visible;
+
+                        viewer.scene.addVolume(volume);
+                        addVolumePropertyListeners(volume); // Add listeners for the new volume
+                    };
+
+                    const scale = {x: 50, y: 50, z: 1000};
+                    const positionVisible = {
+                        x: center.x,
+                        y: center.y,
+                        z: center.z,
+                    };
+
+                    addVolume("Visible", scale, positionVisible, true);
+
+                    viewer.setClipTask(Potree.ClipTask.SHOW_INSIDE);
                 });
-              }
-
-              const addVolume = (name, scale, position, visible) => {
-                volume = new Potree.BoxVolume();
-                volume.name = name;
-                volume.scale.set(scale.x, scale.y, scale.z);
-                volume.position.set(position.x, position.y, position.z);
-                volume.clip = true;
-                volume.visible = visible;
-
-                viewer.scene.addVolume(volume);
-                addVolumePropertyListeners(volume); // Add listeners for the new volume
-              };
-
-              const scale = { x: 50, y: 50, z: 1000 };
-              const positionVisible = {
-                x: center.x,
-                y: center.y,
-                z: center.z,
-              };
-
-              addVolume("Visible", scale, positionVisible, true);
-
-              viewer.setClipTask(Potree.ClipTask.SHOW_INSIDE);
-            });
-          } catch (error) {
-            console.error("Failed to load point cloud", error);
-          }
+            } catch (error) {
+                console.error("Failed to load point cloud", error);
+            }
         };
 
         loadPointCloud("/examples/kalvaria_pcd/metadata.json", "Kalvaria");
 
         viewer.addEventListener("update", () => {
-          const size = viewer.renderer.getSize(new THREE.Vector2());
+            const size = viewer.renderer.getSize(new THREE.Vector2());
 
-          shapeNode.traverse((node) => {
-            if (node.setResolution) {
-              node.setResolution(size.width, size.height);
-            }
-          });
+            shapeNode.traverse((node) => {
+                if (node.setResolution) {
+                    node.setResolution(size.width, size.height);
+                }
+            });
         });
 
         viewer.onGUILoaded(() => {
-          let tree = $(`#jstree_scene`);
-          let parentNode = "other";
+            let tree = $(`#jstree_scene`);
+            let parentNode = "other";
 
-          shapeNode.traverse((node) => {
-            if (node instanceof THREE.Object3D) {
-              let shapefileID = tree.jstree(
-                "create_node",
-                parentNode,
-                {
-                  text: "tree_height_lines",
-                  icon: `${Potree.resourcePath}/icons/triangle.svg`,
-                  object: node,
-                  data: node,
-                },
-                "last",
-                false,
-                false
-              );
-              tree.jstree(
-                node.visible ? "check_node" : "uncheck_node",
-                shapefileID
-              );
-            }
-          });
+            shapeNode.traverse((node) => {
+                if (node instanceof THREE.Object3D) {
+                    let shapefileID = tree.jstree(
+                        "create_node",
+                        parentNode,
+                        {
+                            text: "tree_height_lines",
+                            icon: `${Potree.resourcePath}/icons/triangle.svg`,
+                            object: node,
+                            data: node,
+                        },
+                        "last",
+                        false,
+                        false
+                    );
+                    tree.jstree(
+                        node.visible ? "check_node" : "uncheck_node",
+                        shapefileID
+                    );
+                }
+            });
         });
-      });
-    </script>
-  </body>
+    });
+</script>
+</body>
 </html>
