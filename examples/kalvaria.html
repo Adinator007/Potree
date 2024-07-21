@@ -30,12 +30,14 @@
 <script src="../libs/shapefile/shapefile.js"></script>
 
 <div
-    class="potree_container"
-    style="position: absolute; width: 100%; height: 100%; left: 0px; top: 0px"
+        class="potree_container"
+        style="position: absolute; width: 100%; height: 100%; left: 0px; top: 0px"
 >
     <div
-        id="potree_render_area"
-        style="background-image: url('../build/potree/resources/images/background.jpg');"
+            id="potree_render_area"
+            style="
+          background-image: url('../build/potree/resources/images/background.jpg');
+        "
     ></div>
     <div id="potree_sidebar_container"></div>
 </div>
@@ -47,7 +49,7 @@
     let volume = null;
     let shapeNode = new THREE.Group();
     let offsetZ = 0;
-    let volumeMeasurementResult = { x: 0, y: 0, z: 0 }; // Global variable to store volume measurement
+    let volumeMeasurementResult = {x: 0, y: 0, z: 0}; // Global variable to store volume measurement
     let heightMeasurementResult = 0; // Global variable to store height measurement
     let distanceMeasurementResult = 0; // Global variable to store distance measurement
     let stemDiameterPolygons = []; // Array to store stem diameter polygons
@@ -90,16 +92,17 @@
 
     // Function to handle distance measurement added
     function onDistanceMeasurementAdded(event) {
-        if (event.measurement.name === "Distance") {
-            console.log("EVENT MEASUREMENT NAME: ", event.measurement.name)
-            event.measurement.addEventListener("marker_moved", () => {
-                distanceMeasurementResult = Math.abs(event.measurement.points[0].position.z - event.measurement.points[1].position.z)
+      if (event.measurement.name === "Distance") {
+        console.log("EVENT MEASUREMENT NAME: ", event.measurement.name)
+        event.measurement.addEventListener("marker_moved", () => {
+            distanceMeasurementResult = Math.abs(event.measurement.points[0].position.z - event.measurement.points[1].position.z)
+    
 
-            });
-            console.log("Distance measurement added:", event.measurement);
-            console.log('Distance Measurement Result:', distanceMeasurementResult);
-
-        }
+        });
+        console.log("Distance measurement added:", event.measurement);
+        console.log('Distance Measurement Result:', distanceMeasurementResult);
+        
+      }
     }
 
     // Add listeners for volume properties
@@ -226,10 +229,10 @@
                     (tree) => tree.id === selectedTreeId
                 );
                 if (selectedTree) {
-                    const { x, y, z } = selectedTree;
+                    const {x, y, z} = selectedTree;
                     console.log(
                         `Coordinates for selected tree ID (${selectedTreeId}):`,
-                        { x, y, z }
+                        {x, y, z}
                     );
                     const radius = parseFloat(document.getElementById("radius_slider").value);
                     updateVolumePosition(new THREE.Vector3(x, y, z), radius);
@@ -249,29 +252,28 @@
                 viewer.setClipTask(Potree.ClipTask.SHOW_INSIDE);
             }
         };
-
         const createLineFromGeometry = (geometry, color, lineWidth = 1) => {
-            const material = new THREE.LineBasicMaterial({ color, linewidth: lineWidth, transparent: true, opacity: 0.25 });
-            const points = geometry.coordinates.map(coord => new THREE.Vector3(coord[0], coord[1], coord[2]));
-            const geometryLine = new THREE.BufferGeometry().setFromPoints(points);
-            return new THREE.Line(geometryLine, material);
-        };
-
+          const material = new THREE.LineBasicMaterial({ color, linewidth: lineWidth, transparent: true, opacity: 0.25 });
+          const points = geometry.coordinates.map(coord => new THREE.Vector3(coord[0], coord[1], coord[2]));
+          const geometryLine = new THREE.BufferGeometry().setFromPoints(points);
+          return new THREE.Line(geometryLine, material);
+      };
+        
         const loadShapefile = async (path, color, zShift = 0) => {
             try {
                 const loader = new Potree.ShapefileLoader();
                 const shpPoints = await loader.load(path);
-
+        
                 let isStemDiameter = false;
                 if (path.includes("stem")) {
                     isStemDiameter = true;
                 }
-
+        
                 if (shpPoints && shpPoints.node) {
                     shpPoints.node.position.set(0, 0, zShift);
                     shpPoints.node.updateMatrixWorld(true);
                     console.log("SHAPE type: ", shpPoints);
-
+        
                     shpPoints.node.traverse((node) => {
                         if (node.material) {
                             node.material.color.set(color);
@@ -280,10 +282,10 @@
                             node.material.linewidth = 0.5;
                         }
                     });
-
+        
                     shapeNode.add(shpPoints.node);
                     viewer.scene.scene.add(shapeNode); // Ensure shapeNode is added to the scene
-
+        
                     if (isStemDiameter) {
                         stemDiameterPolygons = shpPoints.features.map(feature => {
                             return createLineFromGeometry(feature.geometry, 0xff00ff); // initial color magenta
@@ -305,6 +307,12 @@
             }
         };
 
+        const updateStemDiameterInfo = (index) => {
+          const stemDiameterValue = (originalStemDiameters[index] || 0).toFixed(3);
+          const measuredHeightValue = (measuredHeights[index] || 0).toFixed(3);
+          document.getElementById("stem_diameter_info").innerHTML = `Stem Diameter: ${stemDiameterValue}<br>Measured Height: ${measuredHeightValue}`;
+        };
+      
         const updateShapefiles = async (treeId) => {
             shapeNode.clear(); // Clear previous shapefiles
             stemDiameterPolygons.forEach(polygon => shapeNode.remove(polygon)); // Remove previous stem diameter polygons
@@ -312,16 +320,16 @@
             viewer.scene.scene.remove(shapeNode); // Ensure shapeNode is removed from the scene
             shapeNode = new THREE.Group(); // Create a new group for the new shapefiles
             viewer.scene.scene.add(shapeNode); // Add the new group to the scene
-
+        
             await loadShapefile(`/outputs/${treeId}/${treeId}_height.shp`, new THREE.Color(0.3, 0.3, 1));
             await loadShapefile(`/outputs/${treeId}/${treeId}_stem_diameters.shp`, new THREE.Color(1, 0, 1), 0); // The logic will set isStemDiameter to true internally
             const zShift = parseFloat(document.getElementById("z_shift_slider").value);
             await loadShapefile(`/outputs/${treeId}/${treeId}_polygon.shp`, new THREE.Color(0, 1, 0), zShift);
-
+        
             const originalMeasurements = await getOriginalMeasurements(treeId);
             if (originalMeasurements && originalMeasurements.stemDiameter) {
                 originalStemDiameters = originalMeasurements.stemDiameter;
-                measuredHeights = originalMeasurements.measuredHeight; // Store the measured heights
+                measuredHeights = originalMeasurements.measuredHeight;
                 updateStemDiameterSlider(stemDiameterPolygons.length);
             }
         };
@@ -366,7 +374,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ treeId, data: updatedData }),
+                    body: JSON.stringify({treeId, data: updatedData}),
                 });
 
                 const responseData = await res.json(); // Parse the response data
@@ -387,7 +395,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ treeId, originalMeasurements }),
+                    body: JSON.stringify({treeId, originalMeasurements}),
                 });
 
                 if (response.ok) {
@@ -427,26 +435,19 @@
             slider.max = numPolygons - 1;
             slider.value = stemDiameterSliderValue;
             document.getElementById("stem_diameter_value").textContent = originalStemDiameters[stemDiameterSliderValue] || 0;
-            updateStemDiameterInfo(stemDiameterSliderValue); // Update the info display
             highlightStemDiameterPolygon(stemDiameterSliderValue);
         };
-
-        const updateStemDiameterInfo = (index) => {
-            const stemDiameterValue = originalStemDiameters[index] || 0;
-            const measuredHeightValue = measuredHeights[index] || 0;
-            document.getElementById("stem_diameter_info").textContent = `Stem Diameter: ${stemDiameterValue}; Measured Height: ${measuredHeightValue}`;
-        };
-
+        
         const highlightStemDiameterPolygon = (index) => {
             const defaultWidth = 10;
             const highlightedWidth = 10;
             const defaultOpacity = 0.25;
             const highlightedOpacity = 1;
-
+        
             stemDiameterPolygons.forEach((polygon, idx) => {
                 if (polygon) {
                     polygon.visible = (idx === index); // Only make the selected polygon visible
-                    polygon.material.color.set(idx === index ? 0xffff00 : 0xff00ff); // yellow for selected, magenta for others
+                    polygon.material.color.set(idx === index ? 0xffff00 : 0xff00ff); // red for selected, magenta for others
                     polygon.material.linewidth = idx === index ? highlightedWidth : defaultWidth; // set the line width
                     polygon.material.transparent = true;
                     polygon.material.opacity = idx === index ? highlightedOpacity : defaultOpacity; // set the opacity
@@ -454,6 +455,7 @@
                 }
             });
         };
+      
 
         document
             .getElementById("submit_button")
@@ -510,10 +512,10 @@
             });
 
         document.getElementById("stem_diameter_slider").addEventListener("input", (event) => {
-            stemDiameterSliderValue = parseInt(event.target.value);
-            document.getElementById("stem_diameter_value").textContent = originalStemDiameters[stemDiameterSliderValue] || 0;
-            updateStemDiameterInfo(stemDiameterSliderValue); // Update the info display
-            highlightStemDiameterPolygon(stemDiameterSliderValue);
+              stemDiameterSliderValue = parseInt(event.target.value);
+              document.getElementById("stem_diameter_value").textContent = originalStemDiameters[stemDiameterSliderValue] || 0;
+              updateStemDiameterInfo(stemDiameterSliderValue); // Update the info display
+              highlightStemDiameterPolygon(stemDiameterSliderValue);
         });
 
         document.getElementById("update_button").addEventListener("click", () => {
@@ -528,7 +530,7 @@
 
         document.getElementById("update_height_button").addEventListener("click", () => {
             if (selectedTreeId) {
-                updateJsonFile(selectedTreeId, { height: heightMeasurementResult });
+                updateJsonFile(selectedTreeId, {height: heightMeasurementResult});
             }
         });
 
@@ -540,7 +542,7 @@
 
         document.getElementById("update_crown_button").addEventListener("click", () => {
             if (selectedTreeId) {
-                updateJsonFile(selectedTreeId, { crownDiameter: calculateCrownDiameter() });
+                updateJsonFile(selectedTreeId, {crownDiameter: calculateCrownDiameter()});
             }
         });
 
@@ -552,7 +554,8 @@
 
         document.getElementById("update_stem_button").addEventListener("click", () => {
             if (selectedTreeId) {
-                updateJsonFile(selectedTreeId, { stemDiameter: originalStemDiameters[stemDiameterSliderValue] });
+                updateJsonFile(selectedTreeId, {stemDiameter: originalStemDiameters[stemDiameterSliderValue]});
+                updateJsonFile(selectedTreeId, {measuredHeight: measuredHeights[stemDiameterSliderValue]});
             }
         });
 
@@ -623,7 +626,7 @@
                         addVolumePropertyListeners(volume); // Add listeners for the new volume
                     };
 
-                    const scale = { x: 50, y: 50, z: 1000 };
+                    const scale = {x: 50, y: 50, z: 1000};
                     const positionVisible = {
                         x: center.x,
                         y: center.y,
