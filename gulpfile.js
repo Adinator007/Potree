@@ -6,6 +6,7 @@ const fsp = fs.promises;
 const concat = require('gulp-concat');
 const connect = require('gulp-connect');
 const bodyParser = require('body-parser');
+const multer = require('multer');
 const { watch } = require('gulp');
 
 const { createExamplesPage } = require("./src/tools/create_potree_page");
@@ -73,50 +74,125 @@ let shaders = [
     "src/materials/shaders/blur.fs",
 ];
 
-// Add this middleware to log incoming requests
+// Middleware to log incoming requests
 const logRequest = (req, _res, next) => {
     console.log(`Received ${req.method} request for ${req.url}`);
     next();
 };
 
-// Start the server with logging middleware
+const upload = multer({ dest: 'uploads/' });
+
 gulp.task('webserver', gulp.series(async function () {
-    console.log("middleware");
-    server = connect.server({
+    connect.server({
         port: 1234,
         https: false,
-		middleware: function (_connect, _opt) {
-			return [
-				logRequest,
-				bodyParser.json(),
-				async function (req, res, next) {
-					if (req.method === 'POST' && req.url === '/update-json') {
-						console.log("POST request received with data:", req.body);
-						const { treeId, data } = req.body;
-		
-						const dir = path.join(__dirname, 'outputs', treeId);
-						const filePath = path.join(dir, `${treeId}_measurements.json`);
-		
-						try {
-							await fsp.mkdir(dir, { recursive: true });
-							await fsp.access(dir, fs.constants.W_OK);
-							await fsp.writeFile(filePath, JSON.stringify(data, null, 2));
-		
-							console.log('File updated successfully:', filePath);
-							res.writeHead(200, {'Content-Type': 'application/json'});
-							res.end(JSON.stringify({ message: 'File updated successfully' }));
-						} catch (err) {
-							console.error('Server error:', err);
-							res.writeHead(500, {'Content-Type': 'application/json'});
-							res.end(JSON.stringify({ error: 'Server error', details: err.message }));
-						}
-					} else {
-						next();
-					}
-				}
-			];
-		}
-		
+        middleware: function (_connect, _opt) {
+            return [
+                logRequest,
+                bodyParser.json(),
+                bodyParser.raw({ type: 'application/octet-stream', limit: '10mb' }),
+                async function (req, res, next) {
+                    if (req.method === 'POST' && req.url === '/save-shapefile-component') {
+                        const filename = req.headers['x-filename'];
+                        const treeId = req.headers['x-treeid'];
+                        const dir = path.join(__dirname, 'outputs', treeId);
+                        const filePath = path.join(dir, filename);
+
+                        try {
+                            await fsp.mkdir(dir, { recursive: true });
+                            await fsp.access(dir, fs.constants.W_OK);
+                            await fsp.writeFile(filePath, req.body);
+
+                            console.log('Shapefile component saved successfully:', filePath);
+                            res.writeHead(200, {'Content-Type': 'application/json'});
+                            res.end(JSON.stringify({ message: 'Shapefile component saved successfully' }));
+                        } catch (err) {
+                            console.error('Server error:', err);
+                            res.writeHead(500, {'Content-Type': 'application/json'});
+                            res.end(JSON.stringify({ error: 'Server error', details: err.message }));
+                        }
+                    } else if (req.method === 'POST' && req.url === '/save-geojson') {
+                        upload.single('file')(req, res, async (err) => {
+                            if (err) {
+                                console.error('Multer error:', err);
+                                res.writeHead(500, { 'Content-Type': 'application/json' });
+                                res.end(JSON.stringify({ error: 'Multer error', details: err.message }));
+                                return;
+                            }
+                            const treeId = req.headers['x-treeid'];
+                            const file = req.file;
+                            const destDir = path.join(__dirname, 'outputs', treeId);
+
+                            try {
+                                await fsp.mkdir(destDir, { recursive: true });
+
+                                // Move the file to the destination directory
+                                const destPath = path.join(destDir, `${treeId}_new_height_measurement.geojson`);
+                                await fsp.rename(file.path, destPath);
+
+                                console.log('GeoJSON file saved successfully:', destPath);
+
+                                // Trigger the Python script
+                                exec(`python3 src/python/scripts/filehandlers/shapeconverter.py ${destPath}`, (error, stdout, stderr) => {
+                                    if (error) {
+                                        console.error('Error executing Python script:', error);
+                                        res.writeHead(500, { 'Content-Type': 'application/json' });
+                                        res.end(JSON.stringify({ error: 'Error executing Python script' }));
+                                        return;
+                                    }
+                                    console.log('Python script executed successfully:', stdout, stderr);
+                                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                                    res.end(JSON.stringify({ message: 'GeoJSON file saved and Python script executed successfully' }));
+                                });
+                            } catch (error) {
+                                console.error('Server error:', error);
+                                res.writeHead(500, { 'Content-Type': 'application/json' });
+                                res.end(JSON.stringify({ error: 'Server error', details: error.message }));
+                            }
+                        });
+                    } else if (req.method === 'POST' && req.url === '/update-json') {
+                        console.log("POST request received with data:", req.body);
+                        const { treeId, data } = req.body;
+
+                        const dir = path.join(__dirname, 'outputs', treeId);
+                        const filePath = path.join(dir, `${treeId}_measurements.json`);
+
+                        try {
+                            await fsp.mkdir(dir, { recursive: true });
+                            await fsp.access(dir, fs.constants.W_OK);
+                            await fsp.writeFile(filePath, JSON.stringify(data, null, 2));
+
+                            console.log('File updated successfully:', filePath);
+                            res.writeHead(200, {'Content-Type': 'application/json'});
+                            res.end(JSON.stringify({ message: 'File updated successfully' }));
+                        } catch (err) {
+                            console.error('Server error:', err);
+                            res.writeHead(500, {'Content-Type': 'application/json'});
+                            res.end(JSON.stringify({ error: 'Server error', details: err.message }));
+                        }
+                    } else if (req.method === 'POST' && req.url === '/save-shapefile') {
+                        console.log("POST request received to save shapefile:", req.body);
+                        const { path: relativePath, data } = req.body;
+
+                        const filePath = path.join(__dirname, relativePath);
+
+                        try {
+                            await fsp.mkdir(path.dirname(filePath), { recursive: true });
+                            await fsp.writeFile(filePath, JSON.stringify(data, null, 2));
+                            console.log('Shapefile saved successfully:', filePath);
+                            res.writeHead(200, {'Content-Type': 'application/json'});
+                            res.end(JSON.stringify({ message: 'Shapefile saved successfully' }));
+                        } catch (err) {
+                            console.error('Server error:', err);
+                            res.writeHead(500, {'Content-Type': 'application/json'});
+                            res.end(JSON.stringify({ error: 'Server error', details: err.message }));
+                        }
+                    } else {
+                        next();
+                    }
+                }
+            ];
+        }
     });
 }));
 
