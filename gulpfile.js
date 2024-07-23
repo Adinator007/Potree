@@ -82,6 +82,18 @@ const logRequest = (req, _res, next) => {
 
 const upload = multer({ dest: 'uploads/' });
 
+let lastExecutionTime = 0;
+const rateLimitMiddleware = (req, res, next) => {
+    const now = Date.now();
+    if (now - lastExecutionTime < 1000) {  // 1000 ms = 1 second
+        res.writeHead(429, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Too many requests, please try again later.' }));
+        return;
+    }
+    lastExecutionTime = now;
+    next();
+};
+
 gulp.task('webserver', gulp.series(async function () {
     connect.server({
         port: 1234,
@@ -91,6 +103,7 @@ gulp.task('webserver', gulp.series(async function () {
                 logRequest,
                 bodyParser.json(),
                 bodyParser.raw({ type: 'application/octet-stream', limit: '10mb' }),
+                rateLimitMiddleware,
                 async function (req, res, next) {
                     if (req.method === 'POST' && req.url === '/save-shapefile-component') {
                         const filename = req.headers['x-filename'];

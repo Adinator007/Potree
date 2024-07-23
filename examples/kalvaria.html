@@ -1,204 +1,205 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="description" content="" />
-    <meta name="author" content="" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-    <title>Potree Viewer</title>
-  
-    <link rel="stylesheet" type="text/css" href="../build/potree/potree.css" />
-    <link rel="stylesheet" type="text/css" href="../libs/jquery-ui/jquery-ui.min.css" />
-    <link rel="stylesheet" type="text/css" href="../libs/openlayers3/ol.css" />
-    <link rel="stylesheet" type="text/css" href="../libs/spectrum/spectrum.css" />
-    <link rel="stylesheet" type="text/css" href="../libs/jstree/themes/mixed/style.css" />
-    <!-- Import FileSaver.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <!-- Import shp-write.js -->
-    <script src="https://unpkg.com/@mapbox/shp-write@latest/shpwrite.js"></script>
-    <!-- Import JSZip.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.6.0/jszip.min.js"></script>
-  </head>
+<head>
+  <meta charset="utf-8" />
+  <meta name="description" content="" />
+  <meta name="author" content="" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Potree Viewer</title>
+
+  <link rel="stylesheet" type="text/css" href="../build/potree/potree.css" />
+  <link rel="stylesheet" type="text/css" href="../libs/jquery-ui/jquery-ui.min.css" />
+  <link rel="stylesheet" type="text/css" href="../libs/openlayers3/ol.css" />
+  <link rel="stylesheet" type="text/css" href="../libs/spectrum/spectrum.css" />
+  <link rel="stylesheet" type="text/css" href="../libs/jstree/themes/mixed/style.css" />
+  <!-- Import FileSaver.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <!-- Import shp-write.js -->
+  <script src="https://unpkg.com/@mapbox/shp-write@latest/shpwrite.js"></script>
+  <!-- Import JSZip.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.6.0/jszip.min.js"></script>
+</head>
 <body>
-  <div class="potree_container" style="position: absolute; width: 100%; height: 100%; left: 0px; top: 0px">
-    <div id="potree_render_area" style="background-image: url('../build/potree/resources/images/background.jpg');"></div>
-    <div id="potree_sidebar_container"></div>
-  </div>
+<div class="potree_container" style="position: absolute; width: 100%; height: 100%; left: 0px; top: 0px">
+  <div id="potree_render_area" style="background-image: url('../build/potree/resources/images/background.jpg');"></div>
+  <div id="potree_sidebar_container"></div>
+</div>
 
-  <script src="../libs/jquery/jquery-3.1.1.min.js"></script>
-  <script src="../libs/spectrum/spectrum.js"></script>
-  <script src="../libs/jquery-ui/jquery-ui.min.js"></script>
-  <script src="../libs/other/BinaryHeap.js"></script>
-  <script src="../libs/tween/tween.min.js"></script>
-  <script src="../libs/d3/d3.js"></script>
-  <script src="../libs/proj4/proj4.js"></script>
-  <script src="../libs/openlayers3/ol.js"></script>
-  <script src="../libs/i18next/i18next.js"></script>
-  <script src="../libs/jstree/jstree.js"></script>
-  <script src="../build/potree/potree.js"></script>
-  <script src="../libs/plasio/js/laslaz.js"></script>
-  <script src="../libs/shapefile/shapefile.js"></script>
+<script src="../libs/jquery/jquery-3.1.1.min.js"></script>
+<script src="../libs/spectrum/spectrum.js"></script>
+<script src="../libs/jquery-ui/jquery-ui.min.js"></script>
+<script src="../libs/other/BinaryHeap.js"></script>
+<script src="../libs/tween/tween.min.js"></script>
+<script src="../libs/d3/d3.js"></script>
+<script src="../libs/proj4/proj4.js"></script>
+<script src="../libs/openlayers3/ol.js"></script>
+<script src="../libs/i18next/i18next.js"></script>
+<script src="../libs/jstree/jstree.js"></script>
+<script src="../build/potree/potree.js"></script>
+<script src="../libs/plasio/js/laslaz.js"></script>
+<script src="../libs/shapefile/shapefile.js"></script>
 
-  <script type="module">
-    import * as THREE from "../libs/three.js/build/three.module.js";
+<script type="module">
+  import * as THREE from "../libs/three.js/build/three.module.js";
 
-    let selectedTreeId = null;
-    let volume = null;
-    let shapeNode = new THREE.Group();
-    let offsetZ = 0;
-    let volumeMeasurementResult = { x: 0, y: 0, z: 0 }; // Global variable to store volume measurement
-    let heightMeasurementResult = 0; // Global variable to store height measurement
-    let distanceMeasurementResult = 0; // Global variable to store distance measurement
-    let stemDiameterPolygons = []; // Array to store stem diameter polygons
-    let stemDiameterSliderValue = 0; // Selected value from the stem diameter slider
-    let originalStemDiameters = []; // Array to store original stem diameters
-    let measuredHeights = []; // Array to store measured heights
+  let selectedTreeId = null;
+  let volume = null;
+  let shapeNode = new THREE.Group();
+  let offsetZ = 0;
+  let volumeMeasurementResult = { x: 0, y: 0, z: 0 }; // Global variable to store volume measurement
+  let heightMeasurementResult = 0; // Global variable to store height measurement
+  let distanceMeasurementResult = 0; // Global variable to store distance measurement
+  let stemDiameterPolygons = []; // Array to store stem diameter polygons
+  let stemDiameterSliderValue = 0; // Selected value from the stem diameter slider
+  let originalStemDiameters = []; // Array to store original stem diameters
+  let measuredHeights = []; // Array to store measured heights
 
-    window.viewer = new Potree.Viewer(document.getElementById("potree_render_area"));
+  window.viewer = new Potree.Viewer(document.getElementById("potree_render_area"));
 
-    // Function to log measurements
-    function logMeasurements() {
-      const measurements = viewer.scene.measurements;
-
-      console.log("Measurements in the scene:");
-      measurements.forEach(measurement => {
-        console.log(measurement);
-      });
-    }
-
-    // Function to handle volume added
-    function onVolumeAdded(event) {
-      console.log("Volume added:", event.volume);
-      logMeasurements();
-      addVolumePropertyListeners(event.volume);
-    }
-
-    // Function to handle height measurement added
-    function onHeightMeasurementAdded(event) {
-      if (event.measurement.name === "Height") {
-        console.log("EVENT MEASUREMENT NAME: ", event.measurement.name);
-        event.measurement.addEventListener("marker_moved", () => {
-          heightMeasurementResult = Math.abs(event.measurement.points[0].position.z - event.measurement.points[1].position.z);
-          console.log('Height Measurement Result:', heightMeasurementResult);
-
-          // Save the height measurement as a shapefile
-          saveHeightMeasurementAsGeoJSON(selectedTreeId, event.measurement);
-        });
-        console.log("Height measurement added:", event.measurement);
-      }
-    }
-
-    // Function to handle distance measurement added
-    function onDistanceMeasurementAdded(event) {
-      if (event.measurement.name === "Distance") {
-        console.log("EVENT MEASUREMENT NAME: ", event.measurement.name);
-        event.measurement.addEventListener("marker_moved", () => {
-          distanceMeasurementResult = Math.abs(event.measurement.points[0].position.z - event.measurement.points[1].position.z);
-        });
-        console.log("Distance measurement added:", event.measurement);
-        console.log('Distance Measurement Result:', distanceMeasurementResult);
-      }
-    }
-
-    // Add listeners for volume properties
-    function addVolumePropertyListeners(volume) {
-      volume.addEventListener("position_changed", () => {
-        console.log(volume.scale);
-        volumeMeasurementResult = {
-          x: volume.scale.x,
-          y: volume.scale.y,
-          z: volume.scale.z,
-        };
-        console.log('Volume Measurement Result:', volumeMeasurementResult);
-      });
-      volume.addEventListener("scale_changed", () => {
-        console.log(volume.scale);
-        volumeMeasurementResult = {
-          x: volume.scale.x,
-          y: volume.scale.y,
-          z: volume.scale.z,
-        };
-        console.log('Volume Measurement Result:', volumeMeasurementResult);
-      });
-    }
-
-    // Add event listeners to the viewer's scene
-    viewer.scene.addEventListener("volume_added", onVolumeAdded);
-    viewer.scene.addEventListener("measurement_added", onHeightMeasurementAdded);
-    viewer.scene.addEventListener("measurement_added", onDistanceMeasurementAdded);
-
-    console.log("Event listeners added for volume, height, and distance events");
-
-    async function saveHeightMeasurementAsGeoJSON(treeId, heightMeasurement) {
-      try {
-          // Ensure there are valid points
-          if (!heightMeasurement.points || heightMeasurement.points.length < 2) {
-              throw new Error('Height measurement does not have enough points.');
-          }
-  
-          // Extract coordinates
-          const coordinates = [
-              [
-                  heightMeasurement.points[0].position.x,
-                  heightMeasurement.points[0].position.y,
-                  heightMeasurement.points[0].position.z
-              ],
-              [
-                  heightMeasurement.points[1].position.x,
-                  heightMeasurement.points[1].position.y,
-                  heightMeasurement.points[1].position.z
-              ],
-          ];
-  
-          // Validate coordinates
-          if (coordinates.some(coord => coord.some(isNaN))) {
-              throw new Error('Invalid coordinates in height measurement.');
-          }
-  
-          // Create the GeoJSON feature collection
-          const featureCollection = {
-              type: "FeatureCollection",
-              features: [
-                  {
-                      type: "Feature",
-                      geometry: {
-                          type: "LineString",
-                          coordinates: coordinates,
-                      },
-                      properties: {
-                          id: treeId,
-                          height: heightMeasurementResult,
-                      },
-                  }
-              ]
-          };
-  
-          // Save the GeoJSON to a file
-          const blob = new Blob([JSON.stringify(featureCollection)], { type: 'application/json' });
-          const file = new File([blob], `${treeId}_new_height_measurement.geojson`, { type: 'application/json' });
-  
-          // Send the file to the server
-          const formData = new FormData();
-          formData.append('file', file);
-  
-          const response = await fetch('/save-geojson', {
-              method: 'POST',
-              body: formData,
-              headers: {
-                  'x-treeid': treeId,
-              }
-          });
-  
-          if (!response.ok) {
-              throw new Error('Failed to save GeoJSON file on the server');
-          }
-  
-          console.log('GeoJSON file saved successfully on the server');
-      } catch (error) {
-          console.error('Error saving height measurement GeoJSON:', error);
-      }
+  // Debounce function
+  function debounce(func, wait) {
+    let timeout;
+    return function (...args) {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(this, args), wait);
+    };
   }
-  
+
+  // Function to log measurements
+  function logMeasurements() {
+    const measurements = viewer.scene.measurements;
+    console.log("Measurements in the scene:");
+    measurements.forEach(measurement => {
+      console.log(measurement);
+    });
+  }
+
+  // Function to handle volume added
+  function onVolumeAdded(event) {
+    console.log("Volume added:", event.volume);
+    logMeasurements();
+    addVolumePropertyListeners(event.volume);
+  }
+
+  // Function to handle height measurement added
+  function onHeightMeasurementAdded(event) {
+    if (event.measurement.name === "Height") {
+      console.log("EVENT MEASUREMENT NAME: ", event.measurement.name);
+      const debounceMarkerMoved = debounce(() => {
+        heightMeasurementResult = Math.abs(event.measurement.points[0].position.z - event.measurement.points[1].position.z);
+        console.log('Height Measurement Result:', heightMeasurementResult);
+        // Save the height measurement as a shapefile
+        saveHeightMeasurementAsGeoJSON(selectedTreeId, event.measurement);
+      }, 1000);
+      event.measurement.addEventListener("marker_moved", debounceMarkerMoved);
+      console.log("Height measurement added:", event.measurement);
+    }
+  }
+
+  // Function to handle distance measurement added
+  function onDistanceMeasurementAdded(event) {
+    if (event.measurement.name === "Distance") {
+      console.log("EVENT MEASUREMENT NAME: ", event.measurement.name);
+      const debounceMarkerMoved = debounce(() => {
+        distanceMeasurementResult = Math.abs(event.measurement.points[0].position.z - event.measurement.points[1].position.z);
+        console.log('Distance Measurement Result:', distanceMeasurementResult);
+      }, 1000);
+      event.measurement.addEventListener("marker_moved", debounceMarkerMoved);
+      console.log("Distance measurement added:", event.measurement);
+    }
+  }
+
+  // Add listeners for volume properties
+  function addVolumePropertyListeners(volume) {
+    const debouncePositionChanged = debounce(() => {
+      volumeMeasurementResult = {
+        x: volume.scale.x,
+        y: volume.scale.y,
+        z: volume.scale.z,
+      };
+      console.log('Volume Measurement Result:', volumeMeasurementResult);
+    }, 1000);
+    volume.addEventListener("position_changed", debouncePositionChanged);
+    volume.addEventListener("scale_changed", debouncePositionChanged);
+  }
+
+  // Add event listeners to the viewer's scene
+  viewer.scene.addEventListener("volume_added", onVolumeAdded);
+  viewer.scene.addEventListener("measurement_added", onHeightMeasurementAdded);
+  viewer.scene.addEventListener("measurement_added", onDistanceMeasurementAdded);
+
+  console.log("Event listeners added for volume, height, and distance events");
+
+  async function saveHeightMeasurementAsGeoJSON(treeId, heightMeasurement) {
+    try {
+      // Ensure there are valid points
+      if (!heightMeasurement.points || heightMeasurement.points.length < 2) {
+        throw new Error('Height measurement does not have enough points.');
+      }
+
+      // Extract coordinates
+      const coordinates = [
+        [
+          heightMeasurement.points[0].position.x,
+          heightMeasurement.points[0].position.y,
+          heightMeasurement.points[0].position.z
+        ],
+        [
+          heightMeasurement.points[1].position.x,
+          heightMeasurement.points[1].position.y,
+          heightMeasurement.points[1].position.z
+        ],
+      ];
+
+      // Validate coordinates
+      if (coordinates.some(coord => coord.some(isNaN))) {
+        throw new Error('Invalid coordinates in height measurement.');
+      }
+
+      // Create the GeoJSON feature collection
+      const featureCollection = {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: {
+              type: "LineString",
+              coordinates: coordinates,
+            },
+            properties: {
+              id: treeId,
+              height: heightMeasurementResult,
+            },
+          }
+        ]
+      };
+
+      // Save the GeoJSON to a file
+      const blob = new Blob([JSON.stringify(featureCollection)], { type: 'application/json' });
+      const file = new File([blob], `${treeId}_new_height_measurement.geojson`, { type: 'application/json' });
+
+      // Send the file to the server
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/save-geojson', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'x-treeid': treeId,
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save GeoJSON file on the server');
+      }
+
+      console.log('GeoJSON file saved successfully on the server');
+    } catch (error) {
+      console.error('Error saving height measurement GeoJSON:', error);
+    }
+  }
+
   viewer.setEDLEnabled(true);
   viewer.setFOV(60);
   viewer.setPointBudget(1_000_000);
